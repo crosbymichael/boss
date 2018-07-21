@@ -16,6 +16,7 @@ type Resources struct {
 
 type Network struct {
 	Host bool `toml:"host"`
+	CNI  bool `toml:"cni"`
 }
 
 type Mount struct {

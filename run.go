@@ -28,10 +28,6 @@ var runCommand = cli.Command{
 		if _, err := toml.DecodeFile(clix.Args().First(), &config); err != nil {
 			return err
 		}
-		networking, err := cni.New()
-		if err != nil {
-			return err
-		}
 		ctx := namespaces.WithNamespace(context.Background(), clix.GlobalString("namespace"))
 		client, err := containerd.New(
 			defaults.DefaultAddress,
@@ -93,7 +89,11 @@ var runCommand = cli.Command{
 			container.Delete(ctx, containerd.WithSnapshotCleanup)
 			return err
 		}
-		if !config.Network.Host {
+		if config.Network.CNI {
+			networking, err := cni.New()
+			if err != nil {
+				return err
+			}
 			fmt.Println("using CNI networking...")
 			result, err := networking.Setup(config.ID, fmt.Sprintf("/proc/%d/ns/net", task.Pid()))
 			if err != nil {

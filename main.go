@@ -33,7 +33,10 @@ func main() {
 		if clix.GlobalBool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
 		}
-		if err := os.Mkdir(clix.GlobalString("log-path"), 0755); err != nil {
+		if os.Geteuid() != 0 {
+			return fmt.Errorf("boss must be run as root")
+		}
+		if err := os.MkdirAll(clix.GlobalString("log-path"), 0755); err != nil {
 			return err
 		}
 		return nil
