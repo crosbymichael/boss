@@ -10,7 +10,7 @@ type Config struct {
 
 type Resources struct {
 	CPU    float64 `toml:"cpu"`
-	Memory int     `toml:"memory"`
+	Memory int64   `toml:"memory"`
 	Score  int     `toml:"score"`
 }
 

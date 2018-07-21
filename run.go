@@ -60,7 +60,7 @@ var runCommand = cli.Command{
 			opts = append(opts, oci.WithHostHostsFile, oci.WithHostResolvconf, oci.WithHostNamespace(specs.NetworkNamespace))
 		}
 		if config.Resources != nil {
-			opts = append(opts, withResources())
+			opts = append(opts, withResources(config.Resources))
 		}
 		for _, cm := range config.Mounts {
 			opts = append(opts, oci.WithMounts([]specs.Mount{
@@ -115,8 +115,6 @@ var runCommand = cli.Command{
 	},
 }
 
-type SpecOpts func(context.Context, Client, *containers.Container, *Spec) error
-
 func withResources(r *Resources) oci.SpecOpts {
 	return func(ctx context.Context, _ oci.Client, c *containers.Container, s *oci.Spec) error {
 		if r.Memory > 0 {
@@ -134,7 +132,8 @@ func withResources(r *Resources) oci.SpecOpts {
 			}
 		}
 		if r.Score != 0 {
-			s.Linux.Resources.OOMScoreAdj = &r.Score
+			s.Process.OOMScoreAdj = &r.Score
 		}
+		return nil
 	}
 }
