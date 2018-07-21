@@ -38,6 +38,9 @@ func main() {
 		}
 		return nil
 	}
+	app.Commands = []cli.Command{
+		runCommand,
+	}
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprint(os.Stderr, err)
 		os.Exit(1)
