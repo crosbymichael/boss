@@ -84,7 +84,7 @@ var runCommand = cli.Command{
 			return err
 		}
 		fmt.Printf("created container %s with logpath %s\n", config.ID, logpath)
-		task, err := container.NewTask(ctx, cio.NullIO)
+		task, err := container.NewTask(ctx, cio.LogFile(logpath))
 		if err != nil {
 			container.Delete(ctx, containerd.WithSnapshotCleanup)
 			return err
