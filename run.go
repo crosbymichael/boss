@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/BurntSushi/toml"
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands/content"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/contrib/apparmor"
@@ -15,7 +15,7 @@ import (
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
-	cni "github.com/containerd/go-cni"
+	"github.com/containerd/containerd/runtime/restart"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli"
 )
@@ -70,48 +70,20 @@ var runCommand = cli.Command{
 			)
 		}
 		logpath := filepath.Join(clix.GlobalString("log-path"), config.ID)
-		container, err := client.NewContainer(
+		f, err := os.Create(logpath)
+		if err != nil {
+			return err
+		}
+		f.Close()
+		_, err = client.NewContainer(
 			ctx,
 			config.ID,
 			containerd.WithNewSpec(opts...),
-			containerd.WithContainerLabels(map[string]string{
-				"io.containerd/restart.status":  "running",
-				"io.containerd/restart.logpath": logpath,
-			}),
+			restart.WithStatus(containerd.Running),
+			restart.WithLogPath(logpath),
 			containerd.WithNewSnapshot(config.ID, image),
 		)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("created container %s with logpath %s\n", config.ID, logpath)
-		task, err := container.NewTask(ctx, cio.LogFile(logpath))
-		if err != nil {
-			container.Delete(ctx, containerd.WithSnapshotCleanup)
-			return err
-		}
-		if config.Network.CNI {
-			networking, err := cni.New()
-			if err != nil {
-				return err
-			}
-			fmt.Println("using CNI networking...")
-			result, err := networking.Setup(config.ID, fmt.Sprintf("/proc/%d/ns/net", task.Pid()))
-			if err != nil {
-				task.Delete(ctx, containerd.WithProcessKill)
-				container.Delete(ctx, containerd.WithSnapshotCleanup)
-				return err
-			}
-			fmt.Printf("setup networking for %s with IP %#v\n", config.ID, result)
-		}
-
-		fmt.Println("starting container...")
-		if err := task.Start(ctx); err != nil {
-			task.Delete(ctx, containerd.WithProcessKill)
-			container.Delete(ctx, containerd.WithSnapshotCleanup)
-			return err
-		}
-		fmt.Printf("container %s started, have a great day!\n", config.ID)
-		return nil
+		return err
 	},
 }
 
