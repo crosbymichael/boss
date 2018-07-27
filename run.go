@@ -58,7 +58,7 @@ var runCommand = cli.Command{
 			return err
 		}
 		opts := []oci.SpecOpts{
-			oci.WithImageConfig(image),
+			oci.WithImageConfigArgs(image, config.Args),
 			oci.WithHostLocaltime,
 			oci.WithNoNewPrivileges,
 			apparmor.WithDefaultProfile("boss"),

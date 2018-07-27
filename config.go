@@ -7,6 +7,7 @@ type Config struct {
 	Network   Network    `toml:"network"`
 	Mounts    []Mount    `toml:"mounts"`
 	Env       []string   `toml:"env"`
+	Args      []string   `toml:"args"`
 }
 
 type Resources struct {
