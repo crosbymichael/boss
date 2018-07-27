@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"io"
+	"os"
+	"path/filepath"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/defaults"
@@ -10,6 +13,20 @@ import (
 	"github.com/urfave/cli"
 	"golang.org/x/sys/unix"
 )
+
+var logsCommand = cli.Command{
+	Name:  "logs",
+	Usage: "display service logs",
+	Action: func(clix *cli.Context) error {
+		f, err := os.Open(filepath.Join(clix.GlobalString("log-path"), clix.Args().First()))
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		_, err = io.Copy(os.Stdout, f)
+		return err
+	},
+}
 
 var startCommand = cli.Command{
 	Name:  "start",

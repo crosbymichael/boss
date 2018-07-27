@@ -46,6 +46,7 @@ func main() {
 		stopCommand,
 		deleteCommand,
 		startCommand,
+		logsCommand,
 	}
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprint(os.Stderr, err)

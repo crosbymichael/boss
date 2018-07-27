@@ -64,23 +64,13 @@ var runCommand = cli.Command{
 			apparmor.WithDefaultProfile("boss"),
 			seccomp.WithDefaultProfile(),
 			oci.WithEnv(config.Env),
+			withMounts(config.Mounts),
 		}
 		if config.Network.Host {
 			opts = append(opts, oci.WithHostHostsFile, oci.WithHostResolvconf, oci.WithHostNamespace(specs.NetworkNamespace))
 		}
 		if config.Resources != nil {
 			opts = append(opts, withResources(config.Resources))
-		}
-		for _, cm := range config.Mounts {
-			opts = append(opts, oci.WithMounts([]specs.Mount{
-				{
-					Type:        cm.Type,
-					Source:      cm.Source,
-					Destination: cm.Destination,
-					Options:     cm.Options,
-				},
-			}),
-			)
 		}
 		logpath := filepath.Join(clix.GlobalString("log-path"), config.ID)
 		f, err := os.Create(logpath)
@@ -118,6 +108,35 @@ func withResources(r *Resources) oci.SpecOpts {
 		}
 		if r.Score != 0 {
 			s.Process.OOMScoreAdj = &r.Score
+		}
+		return nil
+	}
+}
+
+func withMounts(mounts []Mount) oci.SpecOpts {
+	return func(ctx context.Context, _ oci.Client, c *containers.Container, s *oci.Spec) error {
+		for _, cm := range mounts {
+			if cm.Type == "bind" {
+				// create source if it does not exist
+				if err := os.MkdirAll(filepath.Dir(cm.Source), 0755); err != nil {
+					return err
+				}
+				if err := os.Mkdir(cm.Source, 0755); err != nil {
+					if !os.IsExist(err) {
+						return err
+					}
+				} else {
+					if err := os.Chown(cm.Source, int(s.Process.User.UID), int(s.Process.User.GID)); err != nil {
+						return err
+					}
+				}
+			}
+			s.Mounts = append(s.Mounts, specs.Mount{
+				Type:        cm.Type,
+				Source:      cm.Source,
+				Destination: cm.Destination,
+				Options:     cm.Options,
+			})
 		}
 		return nil
 	}
