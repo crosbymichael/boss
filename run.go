@@ -15,6 +15,7 @@ import (
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/runtime/restart"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli"
@@ -23,6 +24,17 @@ import (
 var runCommand = cli.Command{
 	Name:  "run",
 	Usage: "run a container",
+	Flags: []cli.Flag{
+		cli.StringSliceFlag{
+			Name:  "platform",
+			Usage: "pull content from a specific platform",
+			Value: &cli.StringSlice{platforms.Default()},
+		},
+		cli.BoolFlag{
+			Name:  "all-platforms",
+			Usage: "pull content from all platforms",
+		},
+	},
 	Action: func(clix *cli.Context) error {
 		var config Config
 		if _, err := toml.DecodeFile(clix.Args().First(), &config); err != nil {
@@ -51,6 +63,7 @@ var runCommand = cli.Command{
 			oci.WithNoNewPrivileges,
 			apparmor.WithDefaultProfile("boss"),
 			seccomp.WithDefaultProfile(),
+			oci.WithEnv(config.Env),
 		}
 		if config.Network.Host {
 			opts = append(opts, oci.WithHostHostsFile, oci.WithHostResolvconf, oci.WithHostNamespace(specs.NetworkNamespace))

@@ -11,7 +11,7 @@ import (
 func main() {
 	app := cli.NewApp()
 	app.Name = "boss"
-	app.Version = "1"
+	app.Version = "2"
 	app.Description = "run containers like a boss or rick ross"
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
@@ -43,6 +43,9 @@ func main() {
 	}
 	app.Commands = []cli.Command{
 		runCommand,
+		stopCommand,
+		deleteCommand,
+		startCommand,
 	}
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprint(os.Stderr, err)
