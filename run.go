@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 	"github.com/containerd/containerd"
@@ -16,7 +17,6 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/containerd/runtime/restart"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli"
 )
@@ -66,28 +66,31 @@ var runCommand = cli.Command{
 			oci.WithEnv(config.Env),
 			withMounts(config.Mounts),
 		}
-		if config.Network.Host {
+		if config.HostNetwork {
 			opts = append(opts, oci.WithHostHostsFile, oci.WithHostResolvconf, oci.WithHostNamespace(specs.NetworkNamespace))
 		}
 		if config.Resources != nil {
 			opts = append(opts, withResources(config.Resources))
 		}
-		logpath := filepath.Join(clix.GlobalString("log-path"), config.ID)
-		f, err := os.Create(logpath)
-		if err != nil {
-			return err
-		}
-		f.Close()
 		_, err = client.NewContainer(
 			ctx,
 			config.ID,
 			containerd.WithNewSpec(opts...),
-			restart.WithStatus(containerd.Running),
-			restart.WithLogPath(logpath),
+			withStatus(containerd.Running),
+			containerd.WithContainerLabels(toStrings(config.Labels)),
 			containerd.WithNewSnapshot(config.ID, image),
+			containerd.WithContainerExtension(configExtention, config),
 		)
 		return err
 	},
+}
+
+func withStatus(status containerd.ProcessStatus) func(context.Context, *containerd.Client, *containers.Container) error {
+	return func(_ context.Context, _ *containerd.Client, c *containers.Container) error {
+		ensureLabels(c)
+		c.Labels[statusLabel] = string(status)
+		return nil
+	}
 }
 
 func withResources(r *Resources) oci.SpecOpts {
@@ -140,4 +143,19 @@ func withMounts(mounts []Mount) oci.SpecOpts {
 		}
 		return nil
 	}
+}
+
+func ensureLabels(c *containers.Container) {
+	if c.Labels == nil {
+		c.Labels = make(map[string]string)
+	}
+}
+
+func toStrings(ss []string) map[string]string {
+	m := make(map[string]string, len(ss))
+	for _, s := range ss {
+		parts := strings.SplitN(s, "=", 2)
+		m[parts[0]] = parts[1]
+	}
+	return m
 }

@@ -2,31 +2,14 @@ package main
 
 import (
 	"context"
-	"io"
-	"os"
-	"path/filepath"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/runtime/restart"
+	"github.com/hashicorp/consul/api"
 	"github.com/urfave/cli"
-	"golang.org/x/sys/unix"
 )
-
-var logsCommand = cli.Command{
-	Name:  "logs",
-	Usage: "display service logs",
-	Action: func(clix *cli.Context) error {
-		f, err := os.Open(filepath.Join(clix.GlobalString("log-path"), clix.Args().First()))
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		_, err = io.Copy(os.Stdout, f)
-		return err
-	},
-}
 
 var startCommand = cli.Command{
 	Name:  "start",
@@ -54,6 +37,10 @@ var stopCommand = cli.Command{
 	Name:  "stop",
 	Usage: "stop a running service",
 	Action: func(clix *cli.Context) error {
+		consul, err := api.NewClient(api.DefaultConfig())
+		if err != nil {
+			return err
+		}
 		ctx := namespaces.WithNamespace(context.Background(), clix.GlobalString("namespace"))
 		client, err := containerd.New(
 			defaults.DefaultAddress,
@@ -64,6 +51,10 @@ var stopCommand = cli.Command{
 		}
 		defer client.Close()
 		id := clix.Args().First()
+
+		if err := consul.Agent().EnableServiceMaintenance(id, "manual stop"); err != nil {
+			return err
+		}
 		container, err := client.LoadContainer(ctx, id)
 		if err != nil {
 			return err
@@ -77,9 +68,6 @@ var stopCommand = cli.Command{
 			return err
 		}
 		if err := container.Update(ctx, restart.WithStatus(containerd.Stopped)); err != nil {
-			return err
-		}
-		if err := task.Kill(ctx, unix.SIGTERM); err != nil {
 			return err
 		}
 		<-wait
@@ -104,10 +92,18 @@ var deleteCommand = cli.Command{
 		}
 		defer client.Close()
 		id := clix.Args().First()
+		consul, err := api.NewClient(api.DefaultConfig())
+		if err != nil {
+			return err
+		}
+		if err := consul.Agent().ServiceDeregister(id); err != nil {
+			return err
+		}
 		container, err := client.LoadContainer(ctx, id)
 		if err != nil {
 			return err
 		}
+
 		return container.Delete(ctx, containerd.WithSnapshotCleanup)
 	},
 }
