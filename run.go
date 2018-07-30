@@ -12,6 +12,7 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands/content"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/contrib/apparmor"
+	"github.com/containerd/containerd/contrib/nvidia"
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/namespaces"
@@ -21,9 +22,9 @@ import (
 	"github.com/urfave/cli"
 )
 
-var runCommand = cli.Command{
-	Name:  "run",
-	Usage: "run a container",
+var createCommand = cli.Command{
+	Name:  "create",
+	Usage: "create a container",
 	Flags: []cli.Flag{
 		cli.StringSliceFlag{
 			Name:  "platform",
@@ -71,6 +72,13 @@ var runCommand = cli.Command{
 		}
 		if config.Resources != nil {
 			opts = append(opts, withResources(config.Resources))
+		}
+		if config.GPUs != nil {
+			opts = append(opts, nvidia.WithGPUs(
+				nvidia.WithDevices(config.GPUs.Devices...),
+				nvidia.WithCapabilities(toGpuCaps(config.GPUs.Capbilities)...),
+			),
+			)
 		}
 		_, err = client.NewContainer(
 			ctx,
@@ -158,4 +166,11 @@ func toStrings(ss []string) map[string]string {
 		m[parts[0]] = parts[1]
 	}
 	return m
+}
+
+func toGpuCaps(ss []string) (o []nvidia.Capability) {
+	for _, s := range ss {
+		o = append(o, nvidia.Capability(s))
+	}
+	return o
 }

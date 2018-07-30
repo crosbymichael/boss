@@ -1,7 +1,7 @@
 # boss
 
 This is my tool, built for me, to run containers on my own infra.
-Posting the code publicly if others can find inspiration from it.
+Posting the code publicly if others can find inspiration from it and to see how they can use containerd to build the container platform that they want.
 It's single node right now, no schedulers.
 You manage it on the node.
 
@@ -46,7 +46,12 @@ env = [
 	memory = 24000
 	cpu = 7.0
 
+[gpus]
+	devices = [0]
+	capbilities = ["utility"]
+
 [services]
 	[services.postgres]
 		port = 5432
+		labels = ["prod"]
 ```

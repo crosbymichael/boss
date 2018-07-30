@@ -1,4 +1,4 @@
-# Go support for Protocol Buffers
+# Go support for Protocol Buffers - Google's data interchange format
 
 [![Build Status](https://travis-ci.org/golang/protobuf.svg?branch=master)](https://travis-ci.org/golang/protobuf)
 [![GoDoc](https://godoc.org/github.com/golang/protobuf?status.svg)](https://godoc.org/github.com/golang/protobuf)
@@ -83,15 +83,19 @@ be:
 
 - Relative to the import path:
 
-	protoc --go_out=. inputs/x.proto
-	# writes ./github.com/golang/protobuf/p/x.pb.go
+```shell
+  protoc --go_out=. inputs/x.proto
+  # writes ./github.com/golang/protobuf/p/x.pb.go
+```
 
   (This can work well with `--go_out=$GOPATH`.)
 
 - Relative to the input file:
 
-	protoc --go_out=paths=source_relative:. inputs/x.proto
-	# generate ./inputs/x.pb.go
+```shell
+protoc --go_out=paths=source_relative:. inputs/x.proto
+# generate ./inputs/x.pb.go
+```
 
 ## Generated code ##
 
