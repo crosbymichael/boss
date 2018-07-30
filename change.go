@@ -46,7 +46,7 @@ func (s *startChange) apply(ctx context.Context, client *containerd.Client) erro
 	}
 
 	if !config.HostNetwork {
-		result, err := s.networking.Setup(s.container.ID(), fmt.Sprintf("/proc/%d/ns/net", task.Pid))
+		result, err := s.networking.Setup(s.container.ID(), fmt.Sprintf("/proc/%d/ns/net", task.Pid()))
 		if err != nil {
 			if _, derr := task.Delete(ctx, containerd.WithProcessKill); derr != nil {
 				logrus.WithError(derr).Error("delete task on failed network setup")

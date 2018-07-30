@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
@@ -31,6 +32,12 @@ func main() {
 		killCommand,
 		startCommand,
 		stopCommand,
+	}
+	app.Before = func(clix *cli.Context) error {
+		if clix.GlobalBool("debug") {
+			logrus.SetLevel(logrus.DebugLevel)
+		}
+		return nil
 	}
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprint(os.Stderr, err)

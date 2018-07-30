@@ -1,5 +1,11 @@
 package main
 
+import "github.com/containerd/typeurl"
+
+func init() {
+	typeurl.Register(&Config{}, "io.boss.v1.Config")
+}
+
 type Config struct {
 	ID          string             `toml:"id"`
 	Image       string             `toml:"image"`

@@ -15,7 +15,7 @@ import (
 
 const (
 	statusLabel     = "io.boss/restart.status"
-	configExtention = "io/boss/config"
+	configExtention = "io.boss/config"
 )
 
 type change interface {
@@ -68,6 +68,7 @@ func (m *monitor) run(interval time.Duration) {
 	}
 	for {
 		time.Sleep(interval)
+		logrus.Debug("reconciling")
 		if err := m.reconcile(context.Background()); err != nil {
 			logrus.WithError(err).Error("reconcile")
 		}

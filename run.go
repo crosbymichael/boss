@@ -84,10 +84,10 @@ var createCommand = cli.Command{
 			ctx,
 			config.ID,
 			containerd.WithNewSpec(opts...),
-			withStatus(containerd.Running),
 			containerd.WithContainerLabels(toStrings(config.Labels)),
+			withStatus(containerd.Running),
 			containerd.WithNewSnapshot(config.ID, image),
-			containerd.WithContainerExtension(configExtention, config),
+			containerd.WithContainerExtension(configExtention, &config),
 		)
 		return err
 	},

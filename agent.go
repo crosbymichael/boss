@@ -41,7 +41,7 @@ var agentCommand = cli.Command{
 			return err
 		}
 		defer client.Close()
-		networking, err := cni.New()
+		networking, err := cni.New(cni.WithDefaultConf)
 		if err != nil {
 			return err
 		}
