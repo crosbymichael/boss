@@ -80,13 +80,14 @@ var createCommand = cli.Command{
 			),
 			)
 		}
+		flux := newFlux(client)
 		_, err = client.NewContainer(
 			ctx,
 			config.ID,
 			containerd.WithNewSpec(opts...),
 			containerd.WithContainerLabels(toStrings(config.Labels)),
 			withStatus(containerd.Running),
-			containerd.WithNewSnapshot(config.ID, image),
+			WithNewSnapshotFromImage(flux, image),
 			containerd.WithContainerExtension(configExtention, &config),
 		)
 		return err
