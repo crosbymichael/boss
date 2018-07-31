@@ -30,6 +30,7 @@ func main() {
 		createCommand,
 		deleteCommand,
 		killCommand,
+		servicesCommand,
 		startCommand,
 		stopCommand,
 	}

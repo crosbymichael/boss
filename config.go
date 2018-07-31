@@ -22,6 +22,21 @@ type Config struct {
 type Service struct {
 	Port   int      `toml:"port"`
 	Labels []string `toml:"labels"`
+	Checks []Check  `toml:"checks"`
+}
+
+type CheckType string
+
+const (
+	HTTP CheckType = "http"
+	TCP  CheckType = "tcp"
+	GRPC CheckType = "grpc"
+)
+
+type Check struct {
+	Type     CheckType `toml:"type"`
+	Interval int       `toml:"interval"`
+	Timeout  int       `toml:"timeout"`
 }
 
 type Resources struct {

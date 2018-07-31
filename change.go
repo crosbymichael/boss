@@ -62,13 +62,7 @@ func (s *startChange) apply(ctx context.Context, client *containerd.Client) erro
 		}
 		logrus.WithField("id", config.ID).WithField("ip", ip).Info("setup network interface")
 		for name, srv := range config.Services {
-			reg := &api.AgentServiceRegistration{
-				ID:      config.ID,
-				Name:    name,
-				Tags:    srv.Labels,
-				Port:    srv.Port,
-				Address: ip.String(),
-			}
+			reg := createRegistration(config.ID, name, ip.String(), srv)
 			if err := s.consul.Agent().ServiceRegister(reg); err != nil {
 				logrus.WithError(err).Error("register service")
 			}
