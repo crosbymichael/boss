@@ -6,14 +6,14 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/runtime/restart"
 	"github.com/hashicorp/consul/api"
 	"github.com/urfave/cli"
+	"golang.org/x/sys/unix"
 )
 
-var stopCommand = cli.Command{
-	Name:  "stop",
-	Usage: "stop a running service",
+var killCommand = cli.Command{
+	Name:  "kill",
+	Usage: "kill a running service",
 	Action: func(clix *cli.Context) error {
 		consul, err := api.NewClient(api.DefaultConfig())
 		if err != nil {
@@ -30,7 +30,7 @@ var stopCommand = cli.Command{
 		defer client.Close()
 		id := clix.Args().First()
 
-		if err := consul.Agent().EnableServiceMaintenance(id, "manual stop"); err != nil {
+		if err := consul.Agent().EnableServiceMaintenance(id, "manual kill"); err != nil {
 			return err
 		}
 		container, err := client.LoadContainer(ctx, id)
@@ -45,10 +45,11 @@ var stopCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		if err := container.Update(ctx, restart.WithStatus(containerd.Stopped)); err != nil {
+		if err := task.Kill(ctx, unix.SIGTERM); err != nil {
 			return err
 		}
 		<-wait
+
 		if _, err := task.Delete(ctx); err != nil {
 			return err
 		}
