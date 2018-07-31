@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"os/signal"
 	"time"
 
 	"github.com/containerd/containerd"
@@ -10,6 +12,7 @@ import (
 	"github.com/hashicorp/consul/api"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli"
+	"golang.org/x/sys/unix"
 )
 
 var agentCommand = cli.Command{
@@ -23,6 +26,9 @@ var agentCommand = cli.Command{
 		},
 	},
 	Action: func(clix *cli.Context) error {
+		signals := make(chan os.Signal, 64)
+		signal.Notify(signals, unix.SIGTERM)
+
 		consul, err := api.NewClient(api.DefaultConfig())
 		if err != nil {
 			return err
@@ -49,7 +55,13 @@ var agentCommand = cli.Command{
 			client:     client,
 			networking: networking,
 			consul:     consul,
+			shutdownCh: make(chan struct{}, 1),
 		}
+		go func() {
+			for range signals {
+				m.shutdown()
+			}
+		}()
 		if err := m.attach(); err != nil {
 			return err
 		}

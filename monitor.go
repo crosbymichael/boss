@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/containerd/containerd"
@@ -11,6 +12,7 @@ import (
 	cni "github.com/containerd/go-cni"
 	"github.com/hashicorp/consul/api"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sys/unix"
 )
 
 const (
@@ -26,6 +28,63 @@ type monitor struct {
 	client     *containerd.Client
 	consul     *api.Client
 	networking cni.CNI
+	shutdownCh chan struct{}
+	mu         sync.Mutex
+}
+
+func (m *monitor) shutdown() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	ctx := context.Background()
+	ns, err := m.client.NamespaceService().List(ctx)
+	if err != nil {
+		logrus.WithError(err).Error("list namespaces")
+		close(m.shutdownCh)
+		return
+	}
+	for _, name := range ns {
+		ctx = namespaces.WithNamespace(ctx, name)
+		if err := m.stopContainers(ctx); err != nil {
+			logrus.WithError(err).Errorf("attach task in %s", name)
+		}
+	}
+	close(m.shutdownCh)
+}
+
+func (m *monitor) stopContainers(ctx context.Context) error {
+	containers, err := m.client.Containers(ctx, fmt.Sprintf("labels.%q", statusLabel))
+	if err != nil {
+		return err
+	}
+	wg := &sync.WaitGroup{}
+	for _, c := range containers {
+		task, err := c.Task(ctx, nil)
+		if err != nil {
+			logrus.WithError(err).Errorf("load task %s", c.ID())
+			continue
+		}
+		wait, err := task.Wait(ctx)
+		if err != nil {
+			logrus.WithError(err).Errorf("wait task %s", c.ID())
+			continue
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := task.Kill(ctx, unix.SIGTERM); err != nil {
+				logrus.WithError(err).Errorf("kill task %s", c.ID())
+				return
+			}
+			select {
+			case <-wait:
+				task.Delete(ctx)
+			case <-time.After(10 * time.Second):
+			}
+		}()
+	}
+	wg.Wait()
+	return nil
 }
 
 func (m *monitor) attach() error {
@@ -68,10 +127,18 @@ func (m *monitor) run(interval time.Duration) {
 	}
 	for {
 		time.Sleep(interval)
-		logrus.Debug("reconciling")
-		if err := m.reconcile(context.Background()); err != nil {
-			logrus.WithError(err).Error("reconcile")
+
+		m.mu.Lock()
+		select {
+		case <-m.shutdownCh:
+			return
+		default:
+			logrus.Debug("reconciling")
+			if err := m.reconcile(context.Background()); err != nil {
+				logrus.WithError(err).Error("reconcile")
+			}
 		}
+		m.mu.Unlock()
 	}
 }
 

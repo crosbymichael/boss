@@ -27,6 +27,7 @@ func main() {
 	}
 	app.Commands = []cli.Command{
 		agentCommand,
+		buildCommand,
 		createCommand,
 		deleteCommand,
 		killCommand,
