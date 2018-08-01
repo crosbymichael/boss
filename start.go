@@ -6,7 +6,6 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/runtime/restart"
 	"github.com/urfave/cli"
 )
 
@@ -28,6 +27,6 @@ var startCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		return container.Update(ctx, restart.WithStatus(containerd.Running))
+		return container.Update(ctx, withStatus(containerd.Running))
 	},
 }

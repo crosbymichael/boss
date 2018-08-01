@@ -31,9 +31,11 @@ func main() {
 		createCommand,
 		deleteCommand,
 		killCommand,
+		rollbackCommand,
 		servicesCommand,
 		startCommand,
 		stopCommand,
+		upgradeCommand,
 	}
 	app.Before = func(clix *cli.Context) error {
 		if clix.GlobalBool("debug") {

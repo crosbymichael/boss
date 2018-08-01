@@ -6,7 +6,6 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/runtime/restart"
 	"github.com/hashicorp/consul/api"
 	"github.com/urfave/cli"
 )
@@ -45,7 +44,7 @@ var stopCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		if err := container.Update(ctx, restart.WithStatus(containerd.Stopped)); err != nil {
+		if err := container.Update(ctx, withStatus(containerd.Stopped)); err != nil {
 			return err
 		}
 		<-wait

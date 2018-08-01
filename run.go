@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,6 +17,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/platforms"
+	"github.com/docker/docker/errdefs"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli"
 )
@@ -50,12 +50,8 @@ var createCommand = cli.Command{
 			return err
 		}
 		defer client.Close()
-		image, err := content.Fetch(ctx, client, config.Image, clix)
+		image, err := getImage(ctx, client, config.Image, clix)
 		if err != nil {
-			return err
-		}
-		fmt.Printf("unpacking image into %s\n", containerd.DefaultSnapshotter)
-		if err := image.Unpack(ctx, containerd.DefaultSnapshotter); err != nil {
 			return err
 		}
 		opts := []oci.SpecOpts{
@@ -174,4 +170,20 @@ func toGpuCaps(ss []string) (o []nvidia.Capability) {
 		o = append(o, nvidia.Capability(s))
 	}
 	return o
+}
+
+func getImage(ctx context.Context, client *containerd.Client, ref string, clix *cli.Context) (containerd.Image, error) {
+	image, err := client.GetImage(ctx, ref)
+	if err != nil {
+		if !errdefs.IsNotFound(err) {
+			return nil, err
+		}
+		if image, err = content.Fetch(ctx, client, ref, clix); err != nil {
+			return nil, err
+		}
+		if err := image.Unpack(ctx, containerd.DefaultSnapshotter); err != nil {
+			return nil, err
+		}
+	}
+	return image, nil
 }
