@@ -28,8 +28,9 @@ func main() {
 			Value: "default",
 		},
 		cli.StringFlag{
-			Name:  "register",
-			Usage: "register for services(consul,none)",
+			Name:   "register",
+			Usage:  "register for services(consul,none)",
+			EnvVar: "BOSS_REGISTER",
 		},
 	}
 	app.Commands = []cli.Command{
