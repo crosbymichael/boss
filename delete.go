@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/defaults"
@@ -30,7 +32,7 @@ var deleteCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-
+		os.RemoveAll(filepath.Join(rootDir, id))
 		return container.Delete(ctx, containerd.WithSnapshotCleanup)
 	},
 }
