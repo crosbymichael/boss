@@ -58,15 +58,15 @@ var buildCommand = cli.Command{
 			Usage: "Reference to import build cache from",
 		},
 		cli.BoolFlag{
-			Name:  "no-push",
-			Usage: "don't push the resulting image",
+			Name:  "push",
+			Usage: "push the resulting image",
 		},
 	},
 	Action: func(clix *cli.Context) error {
 		if err := build(clix); err != nil {
 			return err
 		}
-		if clix.Bool("no-push") {
+		if !clix.Bool("push") {
 			return nil
 		}
 		ref := clix.String("name")

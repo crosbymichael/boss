@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"os/signal"
+	"sync"
 	"time"
 
 	"github.com/containerd/containerd"
@@ -26,7 +27,7 @@ var agentCommand = cli.Command{
 	},
 	Action: func(clix *cli.Context) error {
 		signals := make(chan os.Signal, 64)
-		signal.Notify(signals, unix.SIGTERM)
+		signal.Notify(signals, unix.SIGTERM, unix.SIGINT)
 
 		// generate defalt profile
 		if err := apparmor.WithDefaultProfile("boss")(nil, nil, nil, &specs.Spec{
@@ -52,9 +53,17 @@ var agentCommand = cli.Command{
 			register:   register,
 			shutdownCh: make(chan struct{}, 1),
 		}
+		var once sync.Once
 		go func() {
-			for range signals {
-				m.shutdown()
+			for s := range signals {
+				switch s {
+				case unix.SIGTERM:
+					once.Do(m.shutdown)
+				case unix.SIGINT:
+					once.Do(func() {
+						close(m.shutdownCh)
+					})
+				}
 			}
 		}()
 		if err := m.attach(); err != nil {
