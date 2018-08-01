@@ -7,17 +7,28 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
+	"text/tabwriter"
 	"time"
 
 	"github.com/containerd/console"
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/cmd/ctr/commands/content"
+	"github.com/containerd/containerd/defaults"
+	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/pkg/progress"
+	"github.com/containerd/containerd/remotes"
+	"github.com/containerd/containerd/remotes/docker"
 	"github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/client/llb"
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/session/auth/authprovider"
-	"github.com/moby/buildkit/solver/pb"
 	"github.com/moby/buildkit/util/appdefaults"
 	"github.com/moby/buildkit/util/progress/progressui"
-	"github.com/opencontainers/go-digest"
+	"github.com/opencontainers/image-spec/specs-go/v1"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -27,17 +38,12 @@ import (
 
 //  sudo buildctl build --frontend=dockerfile.v0 --local context=. --local dockerfile=. --exporter=image --exporter-opt name=registry2
 var buildCommand = cli.Command{
-	Name:   "build",
-	Usage:  "build",
-	Action: build,
+	Name:  "build",
+	Usage: "build",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "name",
 			Usage: "Name of the image to create",
-		},
-		cli.BoolFlag{
-			Name:  "no-cache",
-			Usage: "Disable cache for all the vertices. Frontend is not supported.",
 		},
 		cli.StringFlag{
 			Name:  "export-cache",
@@ -51,29 +57,114 @@ var buildCommand = cli.Command{
 			Name:  "import-cache",
 			Usage: "Reference to import build cache from",
 		},
+		cli.BoolFlag{
+			Name:  "no-push",
+			Usage: "don't push the resulting image",
+		},
 	},
+	Action: func(clix *cli.Context) error {
+		if err := build(clix); err != nil {
+			return err
+		}
+		if clix.Bool("no-push") {
+			return nil
+		}
+		ref := clix.String("name")
+		ctx := namespaces.WithNamespace(context.Background(), clix.GlobalString("namespace"))
+		client, err := containerd.New(
+			defaults.DefaultAddress,
+			containerd.WithDefaultRuntime("io.containerd.runc.v1"),
+		)
+		if err != nil {
+			return err
+		}
+		defer client.Close()
+		return push(ctx, client, ref, clix)
+	},
+}
+
+func push(ctx context.Context, client *containerd.Client, ref string, clix *cli.Context) error {
+	var (
+		local = ref
+		desc  v1.Descriptor
+	)
+	if ref == "" {
+		return errors.New("please provide a remote image reference to push")
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	img, err := client.ImageService().Get(ctx, local)
+	if err != nil {
+		return errors.Wrap(err, "unable to resolve image to manifest")
+	}
+	desc = img.Target
+
+	resolver, err := commands.GetResolver(ctx, clix)
+	if err != nil {
+		return err
+	}
+	ongoing := newPushJobs(commands.PushTracker)
+
+	eg, ctx := errgroup.WithContext(ctx)
+
+	eg.Go(func() error {
+		log.G(ctx).WithField("image", ref).WithField("digest", desc.Digest).Debug("pushing")
+
+		jobHandler := images.HandlerFunc(func(ctx context.Context, desc v1.Descriptor) ([]v1.Descriptor, error) {
+			ongoing.add(remotes.MakeRefKey(ctx, desc))
+			return nil, nil
+		})
+
+		return client.Push(ctx, ref, desc,
+			containerd.WithResolver(resolver),
+			containerd.WithImageHandler(jobHandler),
+		)
+	})
+
+	errs := make(chan error)
+	go func() {
+		defer close(errs)
+		errs <- eg.Wait()
+	}()
+
+	var (
+		ticker = time.NewTicker(100 * time.Millisecond)
+		fw     = progress.NewWriter(os.Stdout)
+		start  = time.Now()
+		done   bool
+	)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			fw.Flush()
+
+			tw := tabwriter.NewWriter(fw, 1, 8, 1, ' ', 0)
+
+			content.Display(tw, ongoing.status(), start)
+			tw.Flush()
+
+			if done {
+				fw.Flush()
+				return nil
+			}
+		case err := <-errs:
+			if err != nil {
+				return err
+			}
+			done = true
+		case <-ctx.Done():
+			done = true // allow ui to update once more
+		}
+	}
+
 }
 
 func read(r io.Reader, clicontext *cli.Context) (*llb.Definition, error) {
 	def, err := llb.ReadFrom(r)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse input")
-	}
-	if clicontext.Bool("no-cache") {
-		for _, dt := range def.Def {
-			var op pb.Op
-			if err := (&op).Unmarshal(dt); err != nil {
-				return nil, errors.Wrap(err, "failed to parse llb proto op")
-			}
-			dgst := digest.FromBytes(dt)
-			opMetadata, ok := def.Metadata[dgst]
-			if !ok {
-				opMetadata = pb.OpMetadata{}
-			}
-			c := llb.Constraints{Metadata: opMetadata}
-			llb.IgnoreCache(&c)
-			def.Metadata[dgst] = c.Metadata
-		}
 	}
 	return def, nil
 }
@@ -124,17 +215,6 @@ func build(clicontext *cli.Context) error {
 	}
 
 	var def *llb.Definition
-	if clicontext.String("frontend") == "" {
-		def, err = read(os.Stdin, clicontext)
-		if err != nil {
-			return err
-		}
-	} else {
-		if clicontext.Bool("no-cache") {
-			return errors.New("no-cache is not supported for frontends")
-		}
-	}
-
 	eg.Go(func() error {
 		resp, err := c.Solve(ctx, def, solveOpt, ch)
 		if err != nil {
@@ -206,7 +286,7 @@ func resolveExporterOutput(exporter, output string) (io.WriteCloser, string, err
 }
 
 func commandContext(c *cli.Context) context.Context {
-	return c.App.Metadata["context"].(context.Context)
+	return context.Background()
 }
 
 func resolveClient(c *cli.Context) (*client.Client, error) {
@@ -218,4 +298,63 @@ func resolveClient(c *cli.Context) (*client.Client, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	return client.New(ctx, appdefaults.Address, opts...)
+}
+
+type pushjobs struct {
+	jobs    map[string]struct{}
+	ordered []string
+	tracker docker.StatusTracker
+	mu      sync.Mutex
+}
+
+func newPushJobs(tracker docker.StatusTracker) *pushjobs {
+	return &pushjobs{
+		jobs:    make(map[string]struct{}),
+		tracker: tracker,
+	}
+}
+
+func (j *pushjobs) add(ref string) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+
+	if _, ok := j.jobs[ref]; ok {
+		return
+	}
+	j.ordered = append(j.ordered, ref)
+	j.jobs[ref] = struct{}{}
+}
+
+func (j *pushjobs) status() []content.StatusInfo {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+
+	statuses := make([]content.StatusInfo, 0, len(j.jobs))
+	for _, name := range j.ordered {
+		si := content.StatusInfo{
+			Ref: name,
+		}
+
+		status, err := j.tracker.GetStatus(name)
+		if err != nil {
+			si.Status = "waiting"
+		} else {
+			si.Offset = status.Offset
+			si.Total = status.Total
+			si.StartedAt = status.StartedAt
+			si.UpdatedAt = status.UpdatedAt
+			if status.Offset >= status.Total {
+				if status.UploadUUID == "" {
+					si.Status = "done"
+				} else {
+					si.Status = "committing"
+				}
+			} else {
+				si.Status = "uploading"
+			}
+		}
+		statuses = append(statuses, si)
+	}
+
+	return statuses
 }
