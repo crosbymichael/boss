@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -24,6 +26,27 @@ var agentCommand = cli.Command{
 			Usage: "set the interval to reconcile state",
 			Value: 10 * time.Second,
 		},
+		cli.StringSliceFlag{
+			Name:  "nameservers,n",
+			Usage: "set the boss nameservers",
+			Value: &cli.StringSlice{
+				"8.8.8.8",
+				"8.8.4.4",
+			},
+		},
+	},
+	Before: func(clix *cli.Context) error {
+		f, err := os.Create(filepath.Join(rootDir, "resolv.conf"))
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		for _, ns := range clix.StringSlice("nameservers") {
+			if _, err := f.WriteString(fmt.Sprintf("nameserver %s\n", ns)); err != nil {
+				return err
+			}
+		}
+		return nil
 	},
 	Action: func(clix *cli.Context) error {
 		signals := make(chan os.Signal, 64)

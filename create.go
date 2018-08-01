@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -65,6 +66,8 @@ var createCommand = cli.Command{
 		}
 		if config.HostNetwork {
 			opts = append(opts, oci.WithHostHostsFile, oci.WithHostResolvconf, oci.WithHostNamespace(specs.NetworkNamespace))
+		} else {
+			opts = append(opts, withBossResolvconf, withContainerHostsFile)
 		}
 		if config.Resources != nil {
 			opts = append(opts, withResources(config.Resources))
@@ -186,4 +189,47 @@ func getImage(ctx context.Context, client *containerd.Client, ref string, clix *
 		}
 	}
 	return image, nil
+}
+
+func withContainerHostsFile(ctx context.Context, _ oci.Client, c *containers.Container, s *oci.Spec) error {
+	id := c.ID
+	if err := os.MkdirAll(filepath.Join(rootDir, id), 0711); err != nil {
+		return err
+	}
+	hostname := s.Hostname
+	if hostname == "" {
+		hostname = id
+	}
+	path := filepath.Join(rootDir, id, "hosts")
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	if _, err := f.WriteString("127.0.0.1       localhost\n"); err != nil {
+		return err
+	}
+	if _, err := f.WriteString(fmt.Sprintf("127.0.0.1       %s\n", hostname)); err != nil {
+		return err
+	}
+	if _, err := f.WriteString("::1     localhost ip6-localhost ip6-loopback\n"); err != nil {
+		return err
+	}
+	s.Mounts = append(s.Mounts, specs.Mount{
+		Destination: "/etc/hosts",
+		Type:        "bind",
+		Source:      path,
+		Options:     []string{"rbind", "ro"},
+	})
+	return nil
+}
+
+func withBossResolvconf(ctx context.Context, _ oci.Client, c *containers.Container, s *oci.Spec) error {
+	s.Mounts = append(s.Mounts, specs.Mount{
+		Destination: "/etc/resolv.conf",
+		Type:        "bind",
+		Source:      filepath.Join(rootDir, "resolv.conf"),
+		Options:     []string{"rbind", "ro"},
+	})
+	return nil
 }

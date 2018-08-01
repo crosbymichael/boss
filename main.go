@@ -11,6 +11,8 @@ import (
 
 var register Register
 
+const rootDir = "/var/lib/boss"
+
 func main() {
 	app := cli.NewApp()
 	app.Name = "boss"
@@ -48,6 +50,9 @@ func main() {
 	app.Before = func(clix *cli.Context) error {
 		if clix.GlobalBool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
+		}
+		if err := os.MkdirAll(rootDir, 0711); err != nil {
+			return err
 		}
 		switch clix.GlobalString("register") {
 		case "consul":

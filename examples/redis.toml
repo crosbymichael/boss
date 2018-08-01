@@ -1,3 +1,2 @@
 id = "redis"
 image = "docker.io/library/redis:3.2-alpine"
-host_network = true
