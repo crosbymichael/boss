@@ -6,7 +6,6 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/hashicorp/consul/api"
 	"github.com/urfave/cli"
 )
 
@@ -14,10 +13,6 @@ var stopCommand = cli.Command{
 	Name:  "stop",
 	Usage: "stop a running service",
 	Action: func(clix *cli.Context) error {
-		consul, err := api.NewClient(api.DefaultConfig())
-		if err != nil {
-			return err
-		}
 		ctx := namespaces.WithNamespace(context.Background(), clix.GlobalString("namespace"))
 		client, err := containerd.New(
 			defaults.DefaultAddress,
@@ -29,7 +24,7 @@ var stopCommand = cli.Command{
 		defer client.Close()
 		id := clix.Args().First()
 
-		if err := consul.Agent().EnableServiceMaintenance(id, "manual stop"); err != nil {
+		if err := register.EnableMaintainance(id, "manual stop"); err != nil {
 			return err
 		}
 		container, err := client.LoadContainer(ctx, id)

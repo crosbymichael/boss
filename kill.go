@@ -6,7 +6,6 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/hashicorp/consul/api"
 	"github.com/urfave/cli"
 	"golang.org/x/sys/unix"
 )
@@ -15,10 +14,6 @@ var killCommand = cli.Command{
 	Name:  "kill",
 	Usage: "kill a running service",
 	Action: func(clix *cli.Context) error {
-		consul, err := api.NewClient(api.DefaultConfig())
-		if err != nil {
-			return err
-		}
 		ctx := namespaces.WithNamespace(context.Background(), clix.GlobalString("namespace"))
 		client, err := containerd.New(
 			defaults.DefaultAddress,
@@ -30,7 +25,7 @@ var killCommand = cli.Command{
 		defer client.Close()
 		id := clix.Args().First()
 
-		if err := consul.Agent().EnableServiceMaintenance(id, "manual kill"); err != nil {
+		if err := register.EnableMaintainance(id, "manual kill"); err != nil {
 			return err
 		}
 		container, err := client.LoadContainer(ctx, id)

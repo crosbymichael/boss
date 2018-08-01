@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/BurntSushi/toml"
-	"github.com/hashicorp/consul/api"
 	"github.com/urfave/cli"
 )
 
@@ -28,13 +27,8 @@ var addServiceCommand = cli.Command{
 		if _, err := toml.DecodeFile(clix.Args().First(), &es); err != nil {
 			return err
 		}
-		consul, err := api.NewClient(api.DefaultConfig())
-		if err != nil {
-			return err
-		}
 		for name, s := range es.Services {
-			reg := createRegistration(es.ID, name, es.IP, s)
-			if err := consul.Agent().ServiceRegister(reg); err != nil {
+			if err := register.Register(es.ID, name, es.IP, s); err != nil {
 				return err
 			}
 		}

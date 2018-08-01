@@ -1,38 +1,32 @@
 package main
 
-import (
-	"fmt"
+// Register is an object that registers and manages service information in its backend
+type Register interface {
+	Register(id, name, ip string, s Service) error
+	Deregister(id string) error
+	EnableMaintainance(id, msg string) error
+	DisableMaintainance(id string) error
+}
 
-	"github.com/hashicorp/consul/api"
-)
+type nullRegister struct {
+}
 
-func createRegistration(id, name, ip string, s Service) *api.AgentServiceRegistration {
-	reg := &api.AgentServiceRegistration{
-		ID:      id,
-		Name:    name,
-		Tags:    s.Labels,
-		Port:    s.Port,
-		Address: ip,
-	}
-	for _, c := range s.Checks {
-		var check api.AgentServiceCheck
-		check.Name = name
-		if c.Interval != 0 {
-			check.Interval = fmt.Sprintf("%ds", c.Interval)
-		}
-		if c.Timeout != 0 {
-			check.Timeout = fmt.Sprintf("%ds", c.Timeout)
-		}
-		addr := fmt.Sprintf("%s:%d", ip, s.Port)
-		switch c.Type {
-		case HTTP:
-			check.HTTP = addr
-		case TCP:
-			check.TCP = addr
-		case GRPC:
-			check.GRPC = addr
-		}
-		reg.Checks = append(reg.Checks, &check)
-	}
-	return reg
+// Register sends the provided service registration to the local agent
+func (c *nullRegister) Register(id, name, ip string, s Service) error {
+	return nil
+}
+
+// Deregister sends the provided service registration to the local agent
+func (c *nullRegister) Deregister(id string) error {
+	return nil
+}
+
+// EnableMaintainance places the specific service in maintainace mode
+func (c *nullRegister) EnableMaintainance(id, reason string) error {
+	return nil
+}
+
+// DisableMaintainance removes the specific service out of maintainace mode
+func (c *nullRegister) DisableMaintainance(id string) error {
+	return nil
 }

@@ -10,7 +10,6 @@ import (
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/namespaces"
 	cni "github.com/containerd/go-cni"
-	"github.com/hashicorp/consul/api"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
@@ -26,7 +25,7 @@ type change interface {
 
 type monitor struct {
 	client     *containerd.Client
-	consul     *api.Client
+	register   Register
 	networking cni.CNI
 	shutdownCh chan struct{}
 	mu         sync.Mutex
@@ -184,13 +183,13 @@ func (m *monitor) monitor(ctx context.Context) ([]change, error) {
 			changes = append(changes, &startChange{
 				container:  c,
 				networking: m.networking,
-				consul:     m.consul,
+				register:   m.register,
 			})
 		case containerd.Stopped:
 			changes = append(changes, &stopChange{
 				container:  c,
 				networking: m.networking,
-				consul:     m.consul,
+				register:   m.register,
 			})
 		}
 	}

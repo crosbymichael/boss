@@ -8,7 +8,6 @@ import (
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/platforms"
-	"github.com/hashicorp/consul/api"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"golang.org/x/sys/unix"
@@ -29,10 +28,6 @@ var upgradeCommand = cli.Command{
 		},
 	},
 	Action: func(clix *cli.Context) error {
-		consul, err := api.NewClient(api.DefaultConfig())
-		if err != nil {
-			return err
-		}
 		ctx := namespaces.WithNamespace(context.Background(), clix.GlobalString("namespace"))
 		client, err := containerd.New(
 			defaults.DefaultAddress,
@@ -55,7 +50,7 @@ var upgradeCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		return pauseAndRun(ctx, id, client, consul, func() error {
+		return pauseAndRun(ctx, id, client, func() error {
 			flux := newFlux(client)
 			container, err := client.LoadContainer(ctx, id)
 			if err != nil {
@@ -80,7 +75,7 @@ var upgradeCommand = cli.Command{
 	},
 }
 
-func pauseAndRun(ctx context.Context, id string, client *containerd.Client, consul *api.Client, fn func() error) error {
+func pauseAndRun(ctx context.Context, id string, client *containerd.Client, fn func() error) error {
 	container, err := client.LoadContainer(ctx, id)
 	if err != nil {
 		return err
@@ -89,7 +84,7 @@ func pauseAndRun(ctx context.Context, id string, client *containerd.Client, cons
 	if err != nil {
 		return err
 	}
-	if err := consul.Agent().EnableServiceMaintenance(id, "upgrade image"); err != nil {
+	if err := register.EnableMaintainance(id, "upgrade image"); err != nil {
 		return err
 	}
 	if err := container.Update(ctx, withStatus(containerd.Paused)); err != nil {
@@ -99,7 +94,7 @@ func pauseAndRun(ctx context.Context, id string, client *containerd.Client, cons
 		if err := container.Update(ctx, withStatus(containerd.Running)); err != nil {
 			logrus.WithError(err).Error("update to running")
 		}
-		if err := consul.Agent().DisableServiceMaintenance(id); err != nil {
+		if err := register.DisableMaintainance(id); err != nil {
 			logrus.WithError(err).Error("disable maintaince")
 		}
 	}()

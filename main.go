@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/hashicorp/consul/api"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
+
+var register Register
 
 func main() {
 	app := cli.NewApp()
@@ -24,6 +27,10 @@ func main() {
 			Usage: "containerd namespace",
 			Value: "default",
 		},
+		cli.StringFlag{
+			Name:  "register",
+			Usage: "register for services(consul,none)",
+		},
 	}
 	app.Commands = []cli.Command{
 		agentCommand,
@@ -40,6 +47,18 @@ func main() {
 	app.Before = func(clix *cli.Context) error {
 		if clix.GlobalBool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
+		}
+		switch clix.GlobalString("register") {
+		case "consul":
+			consul, err := api.NewClient(api.DefaultConfig())
+			if err != nil {
+				return err
+			}
+			register = &Consul{
+				client: consul,
+			}
+		default:
+			register = &nullRegister{}
 		}
 		return nil
 	}

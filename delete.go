@@ -6,7 +6,6 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/hashicorp/consul/api"
 	"github.com/urfave/cli"
 )
 
@@ -24,11 +23,7 @@ var deleteCommand = cli.Command{
 		}
 		defer client.Close()
 		id := clix.Args().First()
-		consul, err := api.NewClient(api.DefaultConfig())
-		if err != nil {
-			return err
-		}
-		if err := consul.Agent().ServiceDeregister(id); err != nil {
+		if err := register.Deregister(id); err != nil {
 			return err
 		}
 		container, err := client.LoadContainer(ctx, id)

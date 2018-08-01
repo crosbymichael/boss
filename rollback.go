@@ -7,7 +7,6 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/hashicorp/consul/api"
 	"github.com/urfave/cli"
 	"golang.org/x/sys/unix"
 )
@@ -16,10 +15,6 @@ var rollbackCommand = cli.Command{
 	Name:  "rollback",
 	Usage: "rollback a container to a previous revision",
 	Action: func(clix *cli.Context) error {
-		consul, err := api.NewClient(api.DefaultConfig())
-		if err != nil {
-			return err
-		}
 		ctx := namespaces.WithNamespace(context.Background(), clix.GlobalString("namespace"))
 		client, err := containerd.New(
 			defaults.DefaultAddress,
@@ -66,7 +61,7 @@ var rollbackCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		return pauseAndRun(ctx, id, client, consul, func() error {
+		return pauseAndRun(ctx, id, client, func() error {
 			if err := container.Update(ctx, withImage(image), WithRevision(previous)); err != nil {
 				return err
 			}

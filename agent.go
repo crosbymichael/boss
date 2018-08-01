@@ -9,7 +9,6 @@ import (
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/defaults"
 	cni "github.com/containerd/go-cni"
-	"github.com/hashicorp/consul/api"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli"
 	"golang.org/x/sys/unix"
@@ -29,10 +28,6 @@ var agentCommand = cli.Command{
 		signals := make(chan os.Signal, 64)
 		signal.Notify(signals, unix.SIGTERM)
 
-		consul, err := api.NewClient(api.DefaultConfig())
-		if err != nil {
-			return err
-		}
 		// generate defalt profile
 		if err := apparmor.WithDefaultProfile("boss")(nil, nil, nil, &specs.Spec{
 			Process: &specs.Process{},
@@ -54,7 +49,7 @@ var agentCommand = cli.Command{
 		m := &monitor{
 			client:     client,
 			networking: networking,
-			consul:     consul,
+			register:   register,
 			shutdownCh: make(chan struct{}, 1),
 		}
 		go func() {

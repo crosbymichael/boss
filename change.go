@@ -10,7 +10,6 @@ import (
 	"github.com/containerd/containerd/cio"
 	cni "github.com/containerd/go-cni"
 	"github.com/containerd/typeurl"
-	"github.com/hashicorp/consul/api"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
@@ -18,7 +17,7 @@ import (
 type stopChange struct {
 	container  containerd.Container
 	networking cni.CNI
-	consul     *api.Client
+	register   Register
 }
 
 func (s *stopChange) apply(ctx context.Context, client *containerd.Client) error {
@@ -31,7 +30,7 @@ func (s *stopChange) apply(ctx context.Context, client *containerd.Client) error
 type startChange struct {
 	container  containerd.Container
 	networking cni.CNI
-	consul     *api.Client
+	register   Register
 }
 
 func (s *startChange) apply(ctx context.Context, client *containerd.Client) error {
@@ -62,19 +61,15 @@ func (s *startChange) apply(ctx context.Context, client *containerd.Client) erro
 		}
 		logrus.WithField("id", config.ID).WithField("ip", ip).Info("setup network interface")
 		for name, srv := range config.Services {
-			reg := createRegistration(config.ID, name, ip.String(), srv)
-			if err := s.consul.Agent().ServiceRegister(reg); err != nil {
+			if err := s.register.Register(config.ID, name, ip.String(), srv); err != nil {
 				logrus.WithError(err).Error("register service")
 			}
-		}
-		if err := s.consul.Agent().EnableServiceMaintenance(config.ID, "starting"); err != nil {
-			logrus.WithError(err).Error("enable service maintenance")
 		}
 	}
 	if err := task.Start(ctx); err != nil {
 		return err
 	}
-	if err := s.consul.Agent().DisableServiceMaintenance(config.ID); err != nil {
+	if err := s.register.DisableMaintainance(config.ID); err != nil {
 		logrus.WithError(err).Error("disable service maintenance")
 	}
 	return nil
