@@ -43,9 +43,6 @@ var stopCommand = cli.Command{
 			return err
 		}
 		<-wait
-		if _, err := task.Delete(ctx); err != nil {
-			return err
-		}
 		return nil
 	},
 }

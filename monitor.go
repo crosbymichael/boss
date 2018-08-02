@@ -8,6 +8,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/namespaces"
 	cni "github.com/containerd/go-cni"
 	"github.com/sirupsen/logrus"
@@ -109,6 +110,9 @@ func (m *monitor) attachContainers(ctx context.Context) error {
 	for _, c := range containers {
 		task, err := c.Task(ctx, cio.NewAttach(cio.WithStdio))
 		if err != nil {
+			if errdefs.IsNotFound(err) {
+				continue
+			}
 			logrus.WithError(err).Errorf("load task %s", c.ID())
 			continue
 		}
