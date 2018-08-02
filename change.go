@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/containerd/containerd"
@@ -117,4 +119,19 @@ func getConfig(ctx context.Context, container containerd.Container) (*Config, er
 		return nil, err
 	}
 	return v.(*Config), nil
+}
+
+type deleteChange struct {
+	container  containerd.Container
+	networking cni.CNI
+	register   Register
+}
+
+func (s *deleteChange) apply(ctx context.Context, client *containerd.Client) error {
+	path := filepath.Join(rootDir, s.container.ID())
+	if err := os.RemoveAll(path); err != nil {
+		logrus.WithError(err).Errorf("delete root dir %s", path)
+	}
+	s.networking.Remove(s.container.ID(), "")
+	return s.container.Delete(ctx, containerd.WithSnapshotCleanup)
 }

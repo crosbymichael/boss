@@ -18,6 +18,8 @@ import (
 const (
 	statusLabel     = "io.boss/restart.status"
 	configExtention = "io.boss/config"
+	// custom boss statuses
+	DeleteStatus containerd.ProcessStatus = "delete"
 )
 
 type change interface {
@@ -61,6 +63,9 @@ func (m *monitor) stopContainers(ctx context.Context) error {
 	for _, c := range containers {
 		task, err := c.Task(ctx, nil)
 		if err != nil {
+			if errdefs.IsNotFound(err) {
+				continue
+			}
 			logrus.WithError(err).Errorf("load task %s", c.ID())
 			continue
 		}
@@ -79,7 +84,9 @@ func (m *monitor) stopContainers(ctx context.Context) error {
 			select {
 			case <-wait:
 				task.Delete(ctx)
+				return
 			case <-time.After(10 * time.Second):
+				return
 			}
 		}()
 	}
@@ -134,9 +141,9 @@ func (m *monitor) run(interval time.Duration) {
 		m.mu.Lock()
 		select {
 		case <-m.shutdownCh:
+			logrus.Debug("ending reconcile loop for shutdown")
 			return
 		default:
-			logrus.Debug("reconciling")
 			if err := m.reconcile(context.Background()); err != nil {
 				logrus.WithError(err).Error("reconcile")
 			}
@@ -191,6 +198,12 @@ func (m *monitor) monitor(ctx context.Context) ([]change, error) {
 			})
 		case containerd.Stopped:
 			changes = append(changes, &stopChange{
+				container:  c,
+				networking: m.networking,
+				register:   m.register,
+			})
+		case DeleteStatus:
+			changes = append(changes, &deleteChange{
 				container:  c,
 				networking: m.networking,
 				register:   m.register,

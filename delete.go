@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/defaults"
@@ -25,14 +23,10 @@ var deleteCommand = cli.Command{
 		}
 		defer client.Close()
 		id := clix.Args().First()
-		if err := register.Deregister(id); err != nil {
-			return err
-		}
 		container, err := client.LoadContainer(ctx, id)
 		if err != nil {
 			return err
 		}
-		os.RemoveAll(filepath.Join(rootDir, id))
-		return container.Delete(ctx, containerd.WithSnapshotCleanup)
+		return container.Update(ctx, withStatus(DeleteStatus))
 	},
 }
