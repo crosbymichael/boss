@@ -1,5 +1,7 @@
 # boss
 
+![ross](http://gifs.joelglovier.com/boss/like-a-ross.gif)
+
 This is my tool, built for me, to run containers on my own infra.
 Posting the code publicly if others can find inspiration from it and to see how they can use containerd to build the container platform that they want.
 It's single node right now, no schedulers.

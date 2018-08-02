@@ -66,7 +66,7 @@ var agentCommand = cli.Command{
 			return err
 		}
 		defer client.Close()
-		networking, err := cni.New(cni.WithDefaultConf, cni.WithPluginDir([]string{"/opt/containerd/bin"}))
+		networking, err := cni.New(cni.WithPluginDir([]string{"/opt/containerd/bin"}), cni.WithDefaultConf)
 		if err != nil {
 			return err
 		}

@@ -39,7 +39,6 @@ After=containerd.service
 [Service]
 ExecStart=/usr/local/bin/boss --register {{.Register}} agent --interval {{.Interval}} {{nameservers}}
 Restart=always
-MemoryLimit=128m
 
 [Install]
 WantedBy=multi-user.target`
@@ -52,7 +51,6 @@ After=containerd.service
 [Service]
 ExecStart=/opt/containerd/bin/buildkitd --containerd-worker=true --oci-worker=false
 Restart=always
-MemoryLimit=128m
 
 [Install]
 WantedBy=multi-user.target`
@@ -61,10 +59,9 @@ const dhcpTemplate = `[Unit]
 Description=cni dhcp server
 
 [Service]
-ExecPreStart=/usr/bin/rm -f /run/cni/dhcp.sock
+ExecStartPre=/usr/bin/rm -f /run/cni/dhcp.sock
 ExecStart=/opt/containerd/bin/dhcp daemon
 Restart=always
-MemoryLimit=128m
 
 [Install]
 WantedBy=multi-user.target`

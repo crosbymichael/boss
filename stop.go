@@ -23,10 +23,6 @@ var stopCommand = cli.Command{
 		}
 		defer client.Close()
 		id := clix.Args().First()
-
-		if err := register.EnableMaintainance(id, "manual stop"); err != nil {
-			return err
-		}
 		container, err := client.LoadContainer(ctx, id)
 		if err != nil {
 			return err

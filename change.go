@@ -23,6 +23,9 @@ type stopChange struct {
 }
 
 func (s *stopChange) apply(ctx context.Context, client *containerd.Client) error {
+	if err := s.register.EnableMaintainance(s.container.ID(), "manual stop"); err != nil {
+		return err
+	}
 	if err := killTask(ctx, s.container); err != nil {
 		return err
 	}
@@ -132,6 +135,7 @@ func (s *deleteChange) apply(ctx context.Context, client *containerd.Client) err
 	if err := os.RemoveAll(path); err != nil {
 		logrus.WithError(err).Errorf("delete root dir %s", path)
 	}
+	s.register.Deregister(s.container.ID())
 	s.networking.Remove(s.container.ID(), "")
 	return s.container.Delete(ctx, containerd.WithSnapshotCleanup)
 }

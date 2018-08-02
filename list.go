@@ -45,7 +45,7 @@ var listCommand = cli.Command{
 			task, err := c.Task(ctx, nil)
 			if err != nil {
 				if errdefs.IsNotFound(err) {
-					fmt.Fprintf(w, tfmt, c.ID(), info.Image, containerd.Stopped, "0s", "", 0, "")
+					fmt.Fprintf(w, tfmt, c.ID(), info.Image, containerd.Stopped, "0s", "0/0", "0/0", "0")
 					continue
 				}
 				logrus.WithError(err).Errorf("load task %s", c.ID())
