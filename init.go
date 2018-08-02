@@ -20,6 +20,7 @@ import (
 type agentContext struct {
 	Interval    string
 	Nameservers []string
+	Register    string
 }
 
 func (a *agentContext) nameservers() string {
@@ -36,7 +37,7 @@ Requires=containerd.service
 After=containerd.service
 
 [Service]
-ExecStart=/usr/local/bin/boss agent --interval {{.Interval}} {{nameservers}}
+ExecStart=/usr/local/bin/boss --register {{.Register}} agent --interval {{.Interval}} {{nameservers}}
 Restart=always
 MemoryLimit=128m
 
@@ -100,6 +101,7 @@ var initAgentCommand = cli.Command{
 		ac := &agentContext{
 			Interval:    clix.Duration("interval").String(),
 			Nameservers: clix.StringSlice("nameservers"),
+			Register:    clix.GlobalString("register"),
 		}
 		t, err := template.New("agent").Funcs(template.FuncMap{
 			"nameservers": ac.nameservers,

@@ -32,6 +32,7 @@ func main() {
 		cli.StringFlag{
 			Name:   "register",
 			Usage:  "register for services(consul,none)",
+			Value:  "none",
 			EnvVar: "BOSS_REGISTER",
 		},
 	}
