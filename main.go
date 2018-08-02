@@ -41,6 +41,7 @@ func main() {
 		createCommand,
 		deleteCommand,
 		killCommand,
+		listCommand,
 		rollbackCommand,
 		servicesCommand,
 		startCommand,
