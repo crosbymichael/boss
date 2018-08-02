@@ -49,6 +49,20 @@ After=containerd.service
 
 [Service]
 ExecStart=/opt/containerd/bin/buildkitd --containerd-worker=true --oci-worker=false
+Restart=always
+MemoryLimit=128m
+
+[Install]
+WantedBy=multi-user.target`
+
+const dhcpTemplate = `[Unit]
+Description=cni dhcp server
+
+[Service]
+ExecPreStart=/usr/bin/rm -f /run/cni/dhcp.sock
+ExecStart=/opt/containerd/bin/dhcp daemon
+Restart=always
+MemoryLimit=128m
 
 [Install]
 WantedBy=multi-user.target`
@@ -58,6 +72,8 @@ var initCommand = cli.Command{
 	Usage: "init boss on a system",
 	Subcommands: []cli.Command{
 		initAgentCommand,
+		initBuildkitCommand,
+		initCNICommand,
 	},
 }
 
@@ -139,6 +155,42 @@ var initBuildkitCommand = cli.Command{
 			return err
 		}
 		return systemd("start", "buildkit")
+	},
+}
+
+var initCNICommand = cli.Command{
+	Name:  "cni",
+	Usage: "init cni on a system",
+	Action: func(clix *cli.Context) error {
+		ctx := namespaces.WithNamespace(context.Background(), clix.GlobalString("namespace"))
+		client, err := containerd.New(
+			defaults.DefaultAddress,
+			containerd.WithDefaultRuntime("io.containerd.runc.v1"),
+		)
+		if err != nil {
+			return err
+		}
+		defer client.Close()
+		image, err := getImage(ctx, client, "docker.io/crosbymichael/cni:latest", clix)
+		if err != nil {
+			return err
+		}
+		if err := client.Install(ctx, image); err != nil {
+			return err
+		}
+		f, err := os.Create(filepath.Join("/lib/systemd/system", "cni-dhcp.service"))
+		if err != nil {
+			return err
+		}
+		_, err = f.WriteString(dhcpTemplate)
+		f.Close()
+		if err != nil {
+			return err
+		}
+		if err := systemd("enable", "cni-dhcp"); err != nil {
+			return err
+		}
+		return systemd("start", "cni-dhcp")
 	},
 }
 
