@@ -161,6 +161,12 @@ var initBuildkitCommand = cli.Command{
 var initCNICommand = cli.Command{
 	Name:  "cni",
 	Usage: "init cni on a system",
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "dhcp",
+			Usage: "start the dhcp server",
+		},
+	},
 	Action: func(clix *cli.Context) error {
 		ctx := namespaces.WithNamespace(context.Background(), clix.GlobalString("namespace"))
 		client, err := containerd.New(
@@ -177,6 +183,9 @@ var initCNICommand = cli.Command{
 		}
 		if err := client.Install(ctx, image); err != nil {
 			return err
+		}
+		if !clix.Bool("dhcp") {
+			return nil
 		}
 		f, err := os.Create(filepath.Join("/lib/systemd/system", "cni-dhcp.service"))
 		if err != nil {
