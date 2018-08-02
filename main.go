@@ -16,7 +16,7 @@ const rootDir = "/var/lib/boss"
 func main() {
 	app := cli.NewApp()
 	app.Name = "boss"
-	app.Version = "3"
+	app.Version = "4"
 	app.Usage = "simple container services for me"
 	app.Description = "run containers like a boss or rick ross"
 	app.Flags = []cli.Flag{

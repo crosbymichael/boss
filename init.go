@@ -24,7 +24,7 @@ type agentContext struct {
 func (a *agentContext) nameservers() string {
 	var p []string
 	for _, n := range a.Nameservers {
-		p = append(p, "--nameserver", n)
+		p = append(p, "--nameservers", n)
 	}
 	return strings.Join(p, " ")
 }
