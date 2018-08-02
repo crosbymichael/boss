@@ -181,7 +181,10 @@ func getImage(ctx context.Context, client *containerd.Client, ref string, clix *
 		if !errdefs.IsNotFound(err) {
 			return nil, err
 		}
-		if image, err = content.Fetch(ctx, client, ref, clix); err != nil {
+		if _, err := content.Fetch(ctx, client, ref, clix); err != nil {
+			return nil, err
+		}
+		if image, err = client.GetImage(ctx, ref); err != nil {
 			return nil, err
 		}
 		if err := image.Unpack(ctx, containerd.DefaultSnapshotter); err != nil {

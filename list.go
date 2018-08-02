@@ -10,9 +10,9 @@ import (
 	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/defaults"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/typeurl"
-	"github.com/docker/docker/errdefs"
 	units "github.com/docker/go-units"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -35,7 +35,7 @@ var listCommand = cli.Command{
 			return err
 		}
 		w := tabwriter.NewWriter(os.Stdout, 10, 1, 3, ' ', 0)
-		const tfmt = "%s\t%s\t%s\t%s\t%s\t%d\t%s\t%s\n"
+		const tfmt = "%s\t%s\t%s\t%s\t%s\t%s\t%s\n"
 		fmt.Fprint(w, "ID\tIMAGE\tSTATUS\tCPU\tMEMORY\tPIDS\tSIZE\n")
 		for _, c := range containers {
 			info, err := c.Info(ctx)
@@ -73,7 +73,7 @@ var listCommand = cli.Command{
 			if err != nil {
 				return err
 			}
-			fmt.Fprint(w, tfmt,
+			fmt.Fprintf(w, tfmt,
 				c.ID(),
 				info.Image,
 				status.Status,
