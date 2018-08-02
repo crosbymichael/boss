@@ -40,6 +40,7 @@ func main() {
 		buildCommand,
 		createCommand,
 		deleteCommand,
+		initCommand,
 		killCommand,
 		listCommand,
 		rollbackCommand,

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync"
 
 	winio "github.com/Microsoft/go-winio"
 	"github.com/containerd/containerd/log"
@@ -40,6 +41,7 @@ func NewFIFOSetInDir(_, id string, terminal bool) (*FIFOSet, error) {
 
 func copyIO(fifos *FIFOSet, ioset *Streams) (*cio, error) {
 	var (
+		wg  sync.WaitGroup
 		set []io.Closer
 	)
 
@@ -83,7 +85,9 @@ func copyIO(fifos *FIFOSet, ioset *Streams) (*cio, error) {
 		}(l)
 		set = append(set, l)
 
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			c, err := l.Accept()
 			if err != nil {
 				log.L.WithError(err).Errorf("failed to accept stdout connection on %s", fifos.Stdout)
@@ -111,7 +115,9 @@ func copyIO(fifos *FIFOSet, ioset *Streams) (*cio, error) {
 		}(l)
 		set = append(set, l)
 
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			c, err := l.Accept()
 			if err != nil {
 				log.L.WithError(err).Errorf("failed to accept stderr connection on %s", fifos.Stderr)

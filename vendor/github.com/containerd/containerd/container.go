@@ -173,7 +173,10 @@ func (c *container) Image(ctx context.Context) (Image, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get image %s for container", r.Image)
 	}
-	return NewImage(c.client, i), nil
+	return &image{
+		client: c.client,
+		i:      i,
+	}, nil
 }
 
 func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...NewTaskOpts) (_ Task, err error) {

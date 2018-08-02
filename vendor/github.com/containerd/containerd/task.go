@@ -458,7 +458,10 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 	if im, err = t.client.ImageService().Create(ctx, im); err != nil {
 		return nil, err
 	}
-	return NewImage(t.client, im), nil
+	return &image{
+		client: t.client,
+		i:      im,
+	}, nil
 }
 
 // UpdateTaskInfo allows updated specific settings to be changed on a task
