@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -166,6 +167,11 @@ var initCNICommand = cli.Command{
 			Name:  "dhcp",
 			Usage: "start the dhcp server",
 		},
+		cli.StringSliceFlag{
+			Name:  "networks",
+			Usage: "add cni network configurations",
+			Value: &cli.StringSlice{},
+		},
 	},
 	Action: func(clix *cli.Context) error {
 		ctx := namespaces.WithNamespace(context.Background(), clix.GlobalString("namespace"))
@@ -182,6 +188,9 @@ var initCNICommand = cli.Command{
 			return err
 		}
 		if err := client.Install(ctx, image); err != nil {
+			return err
+		}
+		if err := installNetworks(clix.StringSlice("networks")); err != nil {
 			return err
 		}
 		if !clix.Bool("dhcp") {
@@ -201,6 +210,31 @@ var initCNICommand = cli.Command{
 		}
 		return systemd("start", "cni-dhcp")
 	},
+}
+
+func installNetworks(networks []string) error {
+	path := "/etc/cni/net.d"
+	if err := os.MkdirAll(path, 0711); err != nil {
+		return err
+	}
+	for _, name := range networks {
+		f, err := os.Create(filepath.Join(path, name))
+		if err != nil {
+			return err
+		}
+		data, err := os.Open(name)
+		if err != nil {
+			f.Close()
+			return err
+		}
+		if _, err := io.Copy(f, data); err != nil {
+			f.Close()
+			data.Close()
+		}
+		f.Close()
+		data.Close()
+	}
+	return nil
 }
 
 func systemd(action, name string) error {

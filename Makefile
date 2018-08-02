@@ -2,4 +2,4 @@ all:
 	go build
 
 install:
-	cp boss /usr/local/bin/boss
+	@install boss /usr/local/bin/boss
