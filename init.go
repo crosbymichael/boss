@@ -59,7 +59,7 @@ const dhcpTemplate = `[Unit]
 Description=cni dhcp server
 
 [Service]
-ExecStartPre=/usr/bin/rm -f /run/cni/dhcp.sock
+ExecStartPre=/bin/rm -f /run/cni/dhcp.sock
 ExecStart=/opt/containerd/bin/dhcp daemon
 Restart=always
 
