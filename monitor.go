@@ -15,8 +15,7 @@ import (
 )
 
 const (
-	statusLabel     = "io.boss/restart.status"
-	configExtention = "io.boss/config"
+	statusLabel = "io.boss/restart.status"
 	// custom boss statuses
 	DeleteStatus containerd.ProcessStatus = "delete"
 )
