@@ -11,7 +11,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/defaults"
-	cni "github.com/containerd/go-cni"
+	gocni "github.com/containerd/go-cni"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli"
 	"golang.org/x/sys/unix"
@@ -66,13 +66,15 @@ var agentCommand = cli.Command{
 			return err
 		}
 		defer client.Close()
-		networking, err := cni.New(cni.WithPluginDir([]string{"/opt/containerd/bin"}), cni.WithDefaultConf)
-		if err != nil {
-			return err
+		networks := make(map[NetworkType]Network)
+		networks[Host] = &host{}
+		networks[None] = &none{}
+		if networking, err := gocni.New(gocni.WithPluginDir([]string{"/opt/containerd/bin"}), gocni.WithDefaultConf); err == nil {
+			networks[CNI] = &cni{network: networking}
 		}
 		m := &monitor{
 			client:     client,
-			networking: networking,
+			networking: networks,
 			register:   register,
 			shutdownCh: make(chan struct{}, 1),
 		}

@@ -6,17 +6,25 @@ func init() {
 	typeurl.Register(&Config{}, "io.boss.v1.Config")
 }
 
+type NetworkType string
+
+const (
+	Host NetworkType = "host"
+	CNI  NetworkType = "cni"
+	None NetworkType = "none"
+)
+
 type Config struct {
-	ID          string             `toml:"id"`
-	Image       string             `toml:"image"`
-	Resources   *Resources         `toml:"resources"`
-	GPUs        *GPUs              `toml:"gpus"`
-	Mounts      []Mount            `toml:"mounts"`
-	Env         []string           `toml:"env"`
-	Args        []string           `toml:"args"`
-	Labels      []string           `toml:"labels"`
-	HostNetwork bool               `toml:"host_network"`
-	Services    map[string]Service `toml:"services"`
+	ID        string             `toml:"id"`
+	Image     string             `toml:"image"`
+	Resources *Resources         `toml:"resources"`
+	GPUs      *GPUs              `toml:"gpus"`
+	Mounts    []Mount            `toml:"mounts"`
+	Env       []string           `toml:"env"`
+	Args      []string           `toml:"args"`
+	Labels    []string           `toml:"labels"`
+	Network   NetworkType        `toml:"network"`
+	Services  map[string]Service `toml:"services"`
 }
 
 type Service struct {

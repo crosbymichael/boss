@@ -2,28 +2,24 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"net"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
-	cni "github.com/containerd/go-cni"
 	"github.com/containerd/typeurl"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
 type stopChange struct {
-	container  containerd.Container
-	networking cni.CNI
-	register   Register
+	container containerd.Container
+	m         *monitor
 }
 
 func (s *stopChange) apply(ctx context.Context, client *containerd.Client) error {
-	if err := s.register.EnableMaintainance(s.container.ID(), "manual stop"); err != nil {
+	if err := s.m.register.EnableMaintainance(s.container.ID(), "manual stop"); err != nil {
 		return err
 	}
 	if err := killTask(ctx, s.container); err != nil {
@@ -33,9 +29,8 @@ func (s *stopChange) apply(ctx context.Context, client *containerd.Client) error
 }
 
 type startChange struct {
-	container  containerd.Container
-	networking cni.CNI
-	register   Register
+	container containerd.Container
+	m         *monitor
 }
 
 func (s *startChange) apply(ctx context.Context, client *containerd.Client) error {
@@ -48,25 +43,17 @@ func (s *startChange) apply(ctx context.Context, client *containerd.Client) erro
 	if err != nil {
 		return err
 	}
-
-	if !config.HostNetwork {
-		result, err := s.networking.Setup(s.container.ID(), fmt.Sprintf("/proc/%d/ns/net", task.Pid()))
-		if err != nil {
-			if _, derr := task.Delete(ctx, containerd.WithProcessKill); derr != nil {
-				logrus.WithError(derr).Error("delete task on failed network setup")
-			}
-			return err
+	ip, err := s.m.networking[config.Network].Create(task)
+	if err != nil {
+		if _, derr := task.Delete(ctx, containerd.WithProcessKill); derr != nil {
+			logrus.WithError(derr).Error("delete task on failed network setup")
 		}
-		var ip net.IP
-		for _, ipc := range result.Interfaces["eth0"].IPConfigs {
-			if f := ipc.IP.To4(); f != nil {
-				ip = f
-				break
-			}
-		}
+		return err
+	}
+	if ip != "" {
 		logrus.WithField("id", config.ID).WithField("ip", ip).Info("setup network interface")
 		for name, srv := range config.Services {
-			if err := s.register.Register(config.ID, name, ip.String(), srv); err != nil {
+			if err := s.m.register.Register(config.ID, name, ip, srv); err != nil {
 				logrus.WithError(err).Error("register service")
 			}
 		}
@@ -74,7 +61,7 @@ func (s *startChange) apply(ctx context.Context, client *containerd.Client) erro
 	if err := task.Start(ctx); err != nil {
 		return err
 	}
-	if err := s.register.DisableMaintainance(config.ID); err != nil {
+	if err := s.m.register.DisableMaintainance(config.ID); err != nil {
 		logrus.WithError(err).Error("disable service maintenance")
 	}
 	return nil
@@ -125,9 +112,8 @@ func getConfig(ctx context.Context, container containerd.Container) (*Config, er
 }
 
 type deleteChange struct {
-	container  containerd.Container
-	networking cni.CNI
-	register   Register
+	container containerd.Container
+	m         *monitor
 }
 
 func (s *deleteChange) apply(ctx context.Context, client *containerd.Client) error {
@@ -135,7 +121,11 @@ func (s *deleteChange) apply(ctx context.Context, client *containerd.Client) err
 	if err := os.RemoveAll(path); err != nil {
 		logrus.WithError(err).Errorf("delete root dir %s", path)
 	}
-	s.register.Deregister(s.container.ID())
-	s.networking.Remove(s.container.ID(), "")
+	config, err := getConfig(ctx, s.container)
+	if err != nil {
+		return err
+	}
+	s.m.register.Deregister(s.container.ID())
+	s.m.networking[config.Network].Remove(s.container)
 	return s.container.Delete(ctx, containerd.WithSnapshotCleanup)
 }

@@ -37,6 +37,7 @@ image = "docker.io/timescale/timescaledb:latest-pg10"
 env = [
 	"POSTGRES_PASSWORD=somethings",
 ]
+network = "cni"
 
 [[mounts]]
 	type = "bind"

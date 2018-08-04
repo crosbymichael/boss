@@ -64,7 +64,7 @@ var createCommand = cli.Command{
 			oci.WithEnv(config.Env),
 			withMounts(config.Mounts),
 		}
-		if config.HostNetwork {
+		if config.Network == Host {
 			opts = append(opts, oci.WithHostHostsFile, oci.WithHostResolvconf, oci.WithHostNamespace(specs.NetworkNamespace))
 		} else {
 			opts = append(opts, withBossResolvconf, withContainerHostsFile)

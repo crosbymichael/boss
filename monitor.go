@@ -10,7 +10,6 @@ import (
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/namespaces"
-	cni "github.com/containerd/go-cni"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
@@ -29,7 +28,7 @@ type change interface {
 type monitor struct {
 	client     *containerd.Client
 	register   Register
-	networking cni.CNI
+	networking map[NetworkType]Network
 	shutdownCh chan struct{}
 	mu         sync.Mutex
 }
@@ -192,21 +191,18 @@ func (m *monitor) monitor(ctx context.Context) ([]change, error) {
 		switch desiredStatus {
 		case containerd.Running:
 			changes = append(changes, &startChange{
-				container:  c,
-				networking: m.networking,
-				register:   m.register,
+				container: c,
+				m:         m,
 			})
 		case containerd.Stopped:
 			changes = append(changes, &stopChange{
-				container:  c,
-				networking: m.networking,
-				register:   m.register,
+				container: c,
+				m:         m,
 			})
 		case DeleteStatus:
 			changes = append(changes, &deleteChange{
-				container:  c,
-				networking: m.networking,
-				register:   m.register,
+				container: c,
+				m:         m,
 			})
 		}
 	}

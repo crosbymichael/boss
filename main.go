@@ -16,9 +16,23 @@ const rootDir = "/var/lib/boss"
 func main() {
 	app := cli.NewApp()
 	app.Name = "boss"
-	app.Version = "4"
-	app.Usage = "simple container services for me"
-	app.Description = "run containers like a boss or rick ross"
+	app.Version = "5"
+	app.Usage = "container tools for my setup"
+	app.Description = `
+
+                    ___           ___           ___     
+     _____         /\  \         /\__\         /\__\    
+    /::\  \       /::\  \       /:/ _/_       /:/ _/_   
+   /:/\:\  \     /:/\:\  \     /:/ /\  \     /:/ /\  \  
+  /:/ /::\__\   /:/  \:\  \   /:/ /::\  \   /:/ /::\  \ 
+ /:/_/:/\:|__| /:/__/ \:\__\ /:/_/:/\:\__\ /:/_/:/\:\__\
+ \:\/:/ /:/  / \:\  \ /:/  / \:\/:/ /:/  / \:\/:/ /:/  /
+  \::/_/:/  /   \:\  /:/  /   \::/ /:/  /   \::/ /:/  / 
+   \:\/:/  /     \:\/:/  /     \/_/:/  /     \/_/:/  /  
+    \::/  /       \::/  /        /:/  /        /:/  /   
+     \/__/         \/__/         \/__/         \/__/    
+
+run containers like a boss`
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
 			Name:  "debug",
