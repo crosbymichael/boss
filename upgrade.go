@@ -8,6 +8,7 @@ import (
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/platforms"
+	"github.com/crosbymichael/boss/flux"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"golang.org/x/sys/unix"
@@ -51,19 +52,11 @@ var upgradeCommand = cli.Command{
 			return err
 		}
 		return pauseAndRun(ctx, id, client, func() error {
-			flux := newFlux(client)
 			container, err := client.LoadContainer(ctx, id)
 			if err != nil {
 				return err
 			}
-			if err := container.Update(ctx, withImage(image)); err != nil {
-				return err
-			}
-			revision, err := flux.Save(ctx, container)
-			if err != nil {
-				return err
-			}
-			if err := container.Update(ctx, WithRevision(revision)); err != nil {
+			if err := container.Update(ctx, flux.WithUpgrade(image)); err != nil {
 				return err
 			}
 			task, err := container.Task(ctx, nil)

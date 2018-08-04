@@ -20,7 +20,7 @@ type stopChange struct {
 
 func (s *stopChange) apply(ctx context.Context, client *containerd.Client) error {
 	if err := s.m.register.EnableMaintainance(s.container.ID(), "manual stop"); err != nil {
-		return err
+		logrus.WithError(err).Error("setting service maintaince")
 	}
 	if err := killTask(ctx, s.container); err != nil {
 		return err

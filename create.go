@@ -9,6 +9,7 @@ import (
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/platforms"
+	"github.com/crosbymichael/boss/flux"
 	"github.com/urfave/cli"
 )
 
@@ -44,13 +45,12 @@ var createCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		flux := newFlux(client)
 		_, err = client.NewContainer(
 			ctx,
 			config.ID,
 			WithBossConfig(&config, image),
 			withStatus(containerd.Running),
-			WithNewSnapshotFromImage(flux, image),
+			flux.WithNewSnapshot(image),
 		)
 		return err
 	},

@@ -28,7 +28,7 @@ type NetworkType string
 const (
 	Host NetworkType = "host"
 	CNI  NetworkType = "cni"
-	None NetworkType = "none"
+	None NetworkType = ""
 )
 
 type Config struct {

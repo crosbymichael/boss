@@ -66,12 +66,14 @@ var agentCommand = cli.Command{
 			return err
 		}
 		defer client.Close()
+
 		networks := make(map[NetworkType]Network)
 		networks[Host] = &host{}
 		networks[None] = &none{}
 		if networking, err := gocni.New(gocni.WithPluginDir([]string{"/opt/containerd/bin"}), gocni.WithDefaultConf); err == nil {
 			networks[CNI] = &cni{network: networking}
 		}
+
 		m := &monitor{
 			client:     client,
 			networking: networks,
