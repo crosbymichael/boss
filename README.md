@@ -12,7 +12,7 @@ You manage it on the node.
 * you should be able to update container resources without restarting a container
 * you should be able to update the image without creating a new container
 * you should be able to rollback to a previous container state
-* containers should be able to migrate across nodes, live or otherwise, and keep all there data
+* containers should be able to migrate across nodes, live or otherwise, and keep all their data
 * services are automatically registered and found via DNS
 * don't bother me with fancy graphs and metrics, just alert me when something's wrong
 * logs on disk suck, apps should send to things like sentry when they can, else go to system logger
