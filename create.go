@@ -28,7 +28,7 @@ var createCommand = cli.Command{
 		},
 	},
 	Action: func(clix *cli.Context) error {
-		var config Config
+		var config Container
 		if _, err := toml.DecodeFile(clix.Args().First(), &config); err != nil {
 			return err
 		}

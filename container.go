@@ -17,10 +17,10 @@ import (
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
-const configExtention = "io.boss/config"
+const configExtention = "io.boss/container"
 
 func init() {
-	typeurl.Register(&Config{}, "io.boss.v1.Config")
+	typeurl.Register(&Container{}, "io.boss.v1.Container")
 }
 
 type NetworkType string
@@ -31,7 +31,7 @@ const (
 	None NetworkType = ""
 )
 
-type Config struct {
+type Container struct {
 	ID        string             `toml:"id"`
 	Image     string             `toml:"image"`
 	Resources *Resources         `toml:"resources"`
@@ -45,7 +45,7 @@ type Config struct {
 }
 
 // WithBossConfig is a containerd.NewContainerOpts for spec and container configuration
-func WithBossConfig(config *Config, image containerd.Image) containerd.NewContainerOpts {
+func WithBossConfig(config *Container, image containerd.Image) containerd.NewContainerOpts {
 	return func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
 		// generate the spec
 		if err := containerd.WithNewSpec(config.specOpt(image))(ctx, client, c); err != nil {
@@ -60,7 +60,7 @@ func WithBossConfig(config *Config, image containerd.Image) containerd.NewContai
 	}
 }
 
-func (config *Config) specOpt(image containerd.Image) oci.SpecOpts {
+func (config *Container) specOpt(image containerd.Image) oci.SpecOpts {
 	opts := []oci.SpecOpts{
 		oci.WithImageConfigArgs(image, config.Args),
 		oci.WithHostLocaltime,

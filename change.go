@@ -98,7 +98,7 @@ func killTask(ctx context.Context, container containerd.Container) error {
 	return nil
 }
 
-func getConfig(ctx context.Context, container containerd.Container) (*Config, error) {
+func getConfig(ctx context.Context, container containerd.Container) (*Container, error) {
 	info, err := container.Info(ctx)
 	if err != nil {
 		return nil, err
@@ -108,7 +108,7 @@ func getConfig(ctx context.Context, container containerd.Container) (*Config, er
 	if err != nil {
 		return nil, err
 	}
-	return v.(*Config), nil
+	return v.(*Container), nil
 }
 
 type deleteChange struct {
