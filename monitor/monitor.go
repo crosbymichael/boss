@@ -1,4 +1,4 @@
-package main
+package monitor
 
 import (
 	"context"
@@ -10,29 +10,53 @@ import (
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/crosbymichael/boss/config"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
 const (
-	statusLabel = "io.boss/restart.status"
-	// custom boss statuses
+	StatusLabel = "io.boss/restart.status"
+	// custom boss status
 	DeleteStatus containerd.ProcessStatus = "delete"
 )
 
-type change interface {
-	apply(context.Context, *containerd.Client) error
+// Register is an object that registers and manages service information in its backend
+type Register interface {
+	Register(id, name, ip string, s config.Service) error
+	Deregister(id string) error
+	EnableMaintainance(id, msg string) error
+	DisableMaintainance(id string) error
 }
 
-type monitor struct {
+type Network interface {
+	Create(containerd.Task) (string, error)
+	Remove(containerd.Container) error
+}
+
+// New returns a new monitor for containers
+func New(client *containerd.Client, register Register, networks map[config.NetworkType]Network) *Monitor {
+	return &Monitor{
+		client:     client,
+		register:   register,
+		networks:   networks,
+		shutdownCh: make(chan struct{}, 1),
+	}
+}
+
+type Monitor struct {
 	client     *containerd.Client
 	register   Register
-	networking map[NetworkType]Network
+	networks   map[config.NetworkType]Network
 	shutdownCh chan struct{}
 	mu         sync.Mutex
 }
 
-func (m *monitor) shutdown() {
+func (m *Monitor) Stop() {
+	close(m.shutdownCh)
+}
+
+func (m *Monitor) Shutdown() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -52,8 +76,8 @@ func (m *monitor) shutdown() {
 	close(m.shutdownCh)
 }
 
-func (m *monitor) stopContainers(ctx context.Context) error {
-	containers, err := m.client.Containers(ctx, fmt.Sprintf("labels.%q", statusLabel))
+func (m *Monitor) stopContainers(ctx context.Context) error {
+	containers, err := m.client.Containers(ctx, fmt.Sprintf("labels.%q", StatusLabel))
 	if err != nil {
 		return err
 	}
@@ -92,7 +116,7 @@ func (m *monitor) stopContainers(ctx context.Context) error {
 	return nil
 }
 
-func (m *monitor) attach() error {
+func (m *Monitor) Attach() error {
 	ctx := context.Background()
 	ns, err := m.client.NamespaceService().List(ctx)
 	if err != nil {
@@ -107,8 +131,8 @@ func (m *monitor) attach() error {
 	return nil
 }
 
-func (m *monitor) attachContainers(ctx context.Context) error {
-	containers, err := m.client.Containers(ctx, fmt.Sprintf("labels.%q", statusLabel))
+func (m *Monitor) attachContainers(ctx context.Context) error {
+	containers, err := m.client.Containers(ctx, fmt.Sprintf("labels.%q", StatusLabel))
 	if err != nil {
 		return err
 	}
@@ -129,7 +153,7 @@ func (m *monitor) attachContainers(ctx context.Context) error {
 	return nil
 }
 
-func (m *monitor) run(interval time.Duration) {
+func (m *Monitor) Run(interval time.Duration) {
 	if interval == 0 {
 		interval = 10 * time.Second
 	}
@@ -150,7 +174,7 @@ func (m *monitor) run(interval time.Duration) {
 	}
 }
 
-func (m *monitor) reconcile(ctx context.Context) error {
+func (m *Monitor) reconcile(ctx context.Context) error {
 	ns, err := m.client.NamespaceService().List(ctx)
 	if err != nil {
 		return err
@@ -171,8 +195,8 @@ func (m *monitor) reconcile(ctx context.Context) error {
 	return nil
 }
 
-func (m *monitor) monitor(ctx context.Context) ([]change, error) {
-	containers, err := m.client.Containers(ctx, fmt.Sprintf("labels.%q", statusLabel))
+func (m *Monitor) monitor(ctx context.Context) ([]change, error) {
+	containers, err := m.client.Containers(ctx, fmt.Sprintf("labels.%q", StatusLabel))
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +207,7 @@ func (m *monitor) monitor(ctx context.Context) ([]change, error) {
 			logrus.WithError(err).Errorf("fetch labels for %s", c.ID())
 			continue
 		}
-		desiredStatus := containerd.ProcessStatus(labels[statusLabel])
+		desiredStatus := containerd.ProcessStatus(labels[StatusLabel])
 		if m.isSameStatus(ctx, desiredStatus, c) {
 			continue
 		}
@@ -208,7 +232,7 @@ func (m *monitor) monitor(ctx context.Context) ([]change, error) {
 	return changes, nil
 }
 
-func (m *monitor) isSameStatus(ctx context.Context, desired containerd.ProcessStatus, container containerd.Container) bool {
+func (m *Monitor) isSameStatus(ctx context.Context, desired containerd.ProcessStatus, container containerd.Container) bool {
 	task, err := container.Task(ctx, nil)
 	if err != nil {
 		return desired == containerd.Stopped

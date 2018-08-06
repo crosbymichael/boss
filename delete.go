@@ -6,6 +6,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/crosbymichael/boss/monitor"
 	"github.com/urfave/cli"
 )
 
@@ -27,6 +28,6 @@ var deleteCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		return container.Update(ctx, withStatus(DeleteStatus))
+		return container.Update(ctx, withStatus(monitor.DeleteStatus))
 	},
 }

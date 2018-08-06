@@ -9,7 +9,9 @@ import (
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/platforms"
+	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/flux"
+	"github.com/crosbymichael/boss/monitor"
 	"github.com/urfave/cli"
 )
 
@@ -28,8 +30,8 @@ var createCommand = cli.Command{
 		},
 	},
 	Action: func(clix *cli.Context) error {
-		var config Container
-		if _, err := toml.DecodeFile(clix.Args().First(), &config); err != nil {
+		var container config.Container
+		if _, err := toml.DecodeFile(clix.Args().First(), &container); err != nil {
 			return err
 		}
 		ctx := namespaces.WithNamespace(context.Background(), clix.GlobalString("namespace"))
@@ -41,14 +43,14 @@ var createCommand = cli.Command{
 			return err
 		}
 		defer client.Close()
-		image, err := getImage(ctx, client, config.Image, clix)
+		image, err := getImage(ctx, client, container.Image, clix)
 		if err != nil {
 			return err
 		}
 		_, err = client.NewContainer(
 			ctx,
-			config.ID,
-			WithBossConfig(&config, image),
+			container.ID,
+			config.WithBossConfig(&container, image),
 			withStatus(containerd.Running),
 			flux.WithNewSnapshot(image),
 		)
@@ -59,7 +61,7 @@ var createCommand = cli.Command{
 func withStatus(status containerd.ProcessStatus) func(context.Context, *containerd.Client, *containers.Container) error {
 	return func(_ context.Context, _ *containerd.Client, c *containers.Container) error {
 		ensureLabels(c)
-		c.Labels[statusLabel] = string(status)
+		c.Labels[monitor.StatusLabel] = string(status)
 		return nil
 	}
 }

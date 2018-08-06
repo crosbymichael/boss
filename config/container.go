@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"context"
@@ -17,7 +17,10 @@ import (
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
-const configExtention = "io.boss/container"
+const (
+	Root      = "/var/lib/boss"
+	Extension = "io.boss/container"
+)
 
 func init() {
 	typeurl.Register(&Container{}, "io.boss.v1.Container")
@@ -56,7 +59,7 @@ func WithBossConfig(config *Container, image containerd.Image) containerd.NewCon
 			return err
 		}
 		// save the config as a container extension
-		return containerd.WithContainerExtension(configExtention, config)(ctx, client, c)
+		return containerd.WithContainerExtension(Extension, config)(ctx, client, c)
 	}
 }
 
@@ -124,12 +127,6 @@ type Mount struct {
 	Source      string   `toml:"source"`
 	Destination string   `toml:"destination"`
 	Options     []string `toml:"options"`
-}
-
-func ensureLabels(c *containers.Container) {
-	if c.Labels == nil {
-		c.Labels = make(map[string]string)
-	}
 }
 
 func toStrings(ss []string) map[string]string {
@@ -202,14 +199,14 @@ func withMounts(mounts []Mount) oci.SpecOpts {
 
 func withContainerHostsFile(ctx context.Context, _ oci.Client, c *containers.Container, s *oci.Spec) error {
 	id := c.ID
-	if err := os.MkdirAll(filepath.Join(rootDir, id), 0711); err != nil {
+	if err := os.MkdirAll(filepath.Join(Root, id), 0711); err != nil {
 		return err
 	}
 	hostname := s.Hostname
 	if hostname == "" {
 		hostname = id
 	}
-	path := filepath.Join(rootDir, id, "hosts")
+	path := filepath.Join(Root, id, "hosts")
 	f, err := os.Create(path)
 	if err != nil {
 		return err
@@ -237,7 +234,7 @@ func withBossResolvconf(ctx context.Context, _ oci.Client, c *containers.Contain
 	s.Mounts = append(s.Mounts, specs.Mount{
 		Destination: "/etc/resolv.conf",
 		Type:        "bind",
-		Source:      filepath.Join(rootDir, "resolv.conf"),
+		Source:      filepath.Join(Root, "resolv.conf"),
 		Options:     []string{"rbind", "ro"},
 	})
 	return nil

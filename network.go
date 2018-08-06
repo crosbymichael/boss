@@ -8,11 +8,6 @@ import (
 	networking "github.com/containerd/go-cni"
 )
 
-type Network interface {
-	Create(containerd.Task) (string, error)
-	Remove(containerd.Container) error
-}
-
 type cni struct {
 	network networking.CNI
 }

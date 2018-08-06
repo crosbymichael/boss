@@ -1,18 +1,15 @@
 package main
 
-// Register is an object that registers and manages service information in its backend
-type Register interface {
-	Register(id, name, ip string, s Service) error
-	Deregister(id string) error
-	EnableMaintainance(id, msg string) error
-	DisableMaintainance(id string) error
-}
+import (
+	"github.com/containerd/containerd/containers"
+	"github.com/crosbymichael/boss/config"
+)
 
 type nullRegister struct {
 }
 
 // Register sends the provided service registration to the local agent
-func (c *nullRegister) Register(id, name, ip string, s Service) error {
+func (c *nullRegister) Register(id, name, ip string, s config.Service) error {
 	return nil
 }
 
@@ -29,4 +26,10 @@ func (c *nullRegister) EnableMaintainance(id, reason string) error {
 // DisableMaintainance removes the specific service out of maintainace mode
 func (c *nullRegister) DisableMaintainance(id string) error {
 	return nil
+}
+
+func ensureLabels(c *containers.Container) {
+	if c.Labels == nil {
+		c.Labels = make(map[string]string)
+	}
 }

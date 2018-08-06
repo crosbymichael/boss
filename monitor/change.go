@@ -1,4 +1,4 @@
-package main
+package monitor
 
 import (
 	"context"
@@ -9,13 +9,18 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/typeurl"
+	"github.com/crosbymichael/boss/config"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
+type change interface {
+	apply(context.Context, *containerd.Client) error
+}
+
 type stopChange struct {
 	container containerd.Container
-	m         *monitor
+	m         *Monitor
 }
 
 func (s *stopChange) apply(ctx context.Context, client *containerd.Client) error {
@@ -30,7 +35,7 @@ func (s *stopChange) apply(ctx context.Context, client *containerd.Client) error
 
 type startChange struct {
 	container containerd.Container
-	m         *monitor
+	m         *Monitor
 }
 
 func (s *startChange) apply(ctx context.Context, client *containerd.Client) error {
@@ -43,7 +48,7 @@ func (s *startChange) apply(ctx context.Context, client *containerd.Client) erro
 	if err != nil {
 		return err
 	}
-	ip, err := s.m.networking[config.Network].Create(task)
+	ip, err := s.m.networks[config.Network].Create(task)
 	if err != nil {
 		if _, derr := task.Delete(ctx, containerd.WithProcessKill); derr != nil {
 			logrus.WithError(derr).Error("delete task on failed network setup")
@@ -98,26 +103,26 @@ func killTask(ctx context.Context, container containerd.Container) error {
 	return nil
 }
 
-func getConfig(ctx context.Context, container containerd.Container) (*Container, error) {
+func getConfig(ctx context.Context, container containerd.Container) (*config.Container, error) {
 	info, err := container.Info(ctx)
 	if err != nil {
 		return nil, err
 	}
-	d := info.Extensions[configExtention]
+	d := info.Extensions[config.Extension]
 	v, err := typeurl.UnmarshalAny(&d)
 	if err != nil {
 		return nil, err
 	}
-	return v.(*Container), nil
+	return v.(*config.Container), nil
 }
 
 type deleteChange struct {
 	container containerd.Container
-	m         *monitor
+	m         *Monitor
 }
 
 func (s *deleteChange) apply(ctx context.Context, client *containerd.Client) error {
-	path := filepath.Join(rootDir, s.container.ID())
+	path := filepath.Join(config.Root, s.container.ID())
 	if err := os.RemoveAll(path); err != nil {
 		logrus.WithError(err).Errorf("delete root dir %s", path)
 	}
@@ -126,6 +131,6 @@ func (s *deleteChange) apply(ctx context.Context, client *containerd.Client) err
 		return err
 	}
 	s.m.register.Deregister(s.container.ID())
-	s.m.networking[config.Network].Remove(s.container)
+	s.m.networks[config.Network].Remove(s.container)
 	return s.container.Delete(ctx, containerd.WithSnapshotCleanup)
 }

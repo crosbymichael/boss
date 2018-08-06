@@ -12,6 +12,8 @@ import (
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/defaults"
 	gocni "github.com/containerd/go-cni"
+	"github.com/crosbymichael/boss/config"
+	"github.com/crosbymichael/boss/monitor"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli"
 	"golang.org/x/sys/unix"
@@ -36,7 +38,7 @@ var agentCommand = cli.Command{
 		},
 	},
 	Before: func(clix *cli.Context) error {
-		f, err := os.Create(filepath.Join(rootDir, "resolv.conf"))
+		f, err := os.Create(filepath.Join(config.Root, "resolv.conf"))
 		if err != nil {
 			return err
 		}
@@ -67,36 +69,31 @@ var agentCommand = cli.Command{
 		}
 		defer client.Close()
 
-		networks := make(map[NetworkType]Network)
-		networks[Host] = &host{}
-		networks[None] = &none{}
+		networks := make(map[config.NetworkType]monitor.Network)
+		networks[config.Host] = &host{}
+		networks[config.None] = &none{}
 		if networking, err := gocni.New(gocni.WithPluginDir([]string{"/opt/containerd/bin"}), gocni.WithDefaultConf); err == nil {
-			networks[CNI] = &cni{network: networking}
+			networks[config.CNI] = &cni{network: networking}
 		}
 
-		m := &monitor{
-			client:     client,
-			networking: networks,
-			register:   register,
-			shutdownCh: make(chan struct{}, 1),
-		}
+		m := monitor.New(client, register, networks)
 		var once sync.Once
 		go func() {
 			for s := range signals {
 				switch s {
 				case unix.SIGTERM:
-					once.Do(m.shutdown)
+					once.Do(m.Shutdown)
 				case unix.SIGINT:
 					once.Do(func() {
-						close(m.shutdownCh)
+						m.Stop()
 					})
 				}
 			}
 		}()
-		if err := m.attach(); err != nil {
+		if err := m.Attach(); err != nil {
 			return err
 		}
-		m.run(clix.Duration("interval"))
+		m.Run(clix.Duration("interval"))
 		return nil
 	},
 }

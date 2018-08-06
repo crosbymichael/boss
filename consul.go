@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/crosbymichael/boss/config"
 	"github.com/hashicorp/consul/api"
 )
 
@@ -12,7 +13,7 @@ type Consul struct {
 }
 
 // Register sends the provided service registration to the local agent
-func (c *Consul) Register(id, name, ip string, s Service) error {
+func (c *Consul) Register(id, name, ip string, s config.Service) error {
 	reg := c.registration(id, name, ip, s)
 	if err := c.client.Agent().ServiceRegister(reg); err != nil {
 		return err
@@ -35,7 +36,7 @@ func (c *Consul) DisableMaintainance(id string) error {
 	return c.client.Agent().DisableServiceMaintenance(id)
 }
 
-func (c *Consul) registration(id, name, ip string, s Service) *api.AgentServiceRegistration {
+func (c *Consul) registration(id, name, ip string, s config.Service) *api.AgentServiceRegistration {
 	reg := &api.AgentServiceRegistration{
 		ID:      id,
 		Name:    name,
@@ -54,11 +55,11 @@ func (c *Consul) registration(id, name, ip string, s Service) *api.AgentServiceR
 		}
 		addr := fmt.Sprintf("%s:%d", ip, s.Port)
 		switch c.Type {
-		case HTTP:
+		case config.HTTP:
 			check.HTTP = addr
-		case TCP:
+		case config.TCP:
 			check.TCP = addr
-		case GRPC:
+		case config.GRPC:
 			check.GRPC = addr
 		}
 		reg.Checks = append(reg.Checks, &check)

@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/crosbymichael/boss/config"
+	"github.com/crosbymichael/boss/monitor"
 	"github.com/hashicorp/consul/api"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
-var register Register
-
-const rootDir = "/var/lib/boss"
+var register monitor.Register
 
 func main() {
 	app := cli.NewApp()
@@ -59,7 +59,6 @@ run containers like a boss`
 		killCommand,
 		listCommand,
 		rollbackCommand,
-		servicesCommand,
 		startCommand,
 		stopCommand,
 		upgradeCommand,
@@ -68,7 +67,7 @@ run containers like a boss`
 		if clix.GlobalBool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
 		}
-		if err := os.MkdirAll(rootDir, 0711); err != nil {
+		if err := os.MkdirAll(config.Root, 0711); err != nil {
 			return err
 		}
 		switch clix.GlobalString("register") {
