@@ -235,7 +235,7 @@ func install(ctx context.Context, client *containerd.Client, ref string, clix *c
 	if err != nil {
 		return err
 	}
-	return client.Install(ctx, image)
+	return client.Install(ctx, image, containerd.WithInstallReplace, containerd.WithInstallLibs)
 }
 
 func writeUnit(name, data string) error {

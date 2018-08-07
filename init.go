@@ -78,7 +78,7 @@ var initCommand = cli.Command{
 			})
 		}
 		var (
-			fw    = progress.NewWriter(os.Stdout)
+			fw    = progress.NewWriter(os.Stderr)
 			total = float64(len(steps))
 		)
 		for i, s := range steps {
