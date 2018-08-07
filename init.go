@@ -2,12 +2,18 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"time"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/pkg/progress"
+	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
 type step interface {
+	name() string
 	run(context.Context, *containerd.Client, *cli.Context) error
 }
 
@@ -22,8 +28,11 @@ var initCommand = cli.Command{
 		},
 	},
 	Action: func(clix *cli.Context) error {
-		var steps []step
-		var hasConsul bool
+		var (
+			steps     []step
+			hasConsul bool
+			start     = time.Now()
+		)
 		if cfg.Consul != nil {
 			hasConsul = true
 			steps = append(steps, &consulStep{})
@@ -35,8 +44,7 @@ var initCommand = cli.Command{
 			steps = append(steps, &nodeMetricsStep{})
 			if hasConsul {
 				steps = append(steps, &registerStep{
-					id:   "node-exporter",
-					name: "node-exporter",
+					id: "node-exporter",
 					tags: []string{
 						"metrics",
 					},
@@ -49,7 +57,6 @@ var initCommand = cli.Command{
 			if hasConsul {
 				steps = append(steps, &registerStep{
 					id:   "buildkit",
-					name: "buildkit",
 					port: 9000,
 				})
 			}
@@ -61,10 +68,30 @@ var initCommand = cli.Command{
 			}
 		}
 		steps = append(steps, &agentStep{})
-		for _, s := range steps {
+		if hasConsul {
+			steps = append(steps, &registerStep{
+				id: "containerd",
+				tags: []string{
+					"metrics",
+				},
+				port: 9200,
+			})
+		}
+		var (
+			fw    = progress.NewWriter(os.Stdout)
+			total = float64(len(steps))
+		)
+		for i, s := range steps {
 			if err := s.run(cfg.Context(), cfg.Client(), clix); err != nil {
-				return err
+				return errors.Wrapf(err, "install %s", s.name())
 			}
+			bar := progress.Bar(float64(i) / total)
+			fmt.Fprintf(fw, "%s:\t%d/%d\t%40r\t\n", s.name(), i, int(total), bar)
+
+			fmt.Fprintf(fw, "elapsed: %-4.1fs\t\n",
+				time.Since(start).Seconds(),
+			)
+			fw.Flush()
 		}
 		return nil
 	},

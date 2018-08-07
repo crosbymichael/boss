@@ -26,6 +26,10 @@ WantedBy=multi-user.target`
 type consulStep struct {
 }
 
+func (s *consulStep) name() string {
+	return "install consul"
+}
+
 func (s *consulStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
 	if err := install(ctx, client, cfg.Consul.Image, clix); err != nil {
 		return err
@@ -64,6 +68,10 @@ type joinStep struct {
 	ips []string
 }
 
+func (s *joinStep) name() string {
+	return "join cluster"
+}
+
 func (s *joinStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
 	cmd := exec.CommandContext(ctx, "consul", append([]string{"join"}, s.ips...)...)
 	out, err := cmd.CombinedOutput()
@@ -84,6 +92,10 @@ Restart=always
 WantedBy=multi-user.target`
 
 type nodeMetricsStep struct {
+}
+
+func (s *nodeMetricsStep) name() string {
+	return "install node exporter"
 }
 
 func (s *nodeMetricsStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
@@ -112,6 +124,10 @@ WantedBy=multi-user.target`
 type buildkitStep struct {
 }
 
+func (s *buildkitStep) name() string {
+	return "install buildkit"
+}
+
 func (s *buildkitStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
 	const name = "buildkit.service"
 	if err := install(ctx, client, cfg.Buildkit.Image, clix); err != nil {
@@ -124,6 +140,10 @@ func (s *buildkitStep) run(ctx context.Context, client *containerd.Client, clix 
 }
 
 type cniStep struct {
+}
+
+func (s *cniStep) name() string {
+	return "install cni"
 }
 
 func (s *cniStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
@@ -142,6 +162,10 @@ Restart=always
 WantedBy=multi-user.target`
 
 type dhcpStep struct {
+}
+
+func (s *dhcpStep) name() string {
+	return "install dhcp"
 }
 
 func (s *dhcpStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
@@ -167,6 +191,10 @@ WantedBy=multi-user.target`
 type agentStep struct {
 }
 
+func (s *agentStep) name() string {
+	return "install agent"
+}
+
 func (s *agentStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
 	const name = "boss-agent.service"
 	if err := writeUnit(name, agentUnit); err != nil {
@@ -177,9 +205,12 @@ func (s *agentStep) run(ctx context.Context, client *containerd.Client, clix *cl
 
 type registerStep struct {
 	id   string
-	name string
 	port int
 	tags []string
+}
+
+func (s *registerStep) name() string {
+	return "register " + s.id
 }
 
 func (s *registerStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
@@ -189,7 +220,7 @@ func (s *registerStep) run(ctx context.Context, client *containerd.Client, clix 
 	}
 	reg := &api.AgentServiceRegistration{
 		ID:      s.id,
-		Name:    s.name,
+		Name:    s.id,
 		Tags:    s.tags,
 		Port:    s.port,
 		Address: cfg.IP(),
