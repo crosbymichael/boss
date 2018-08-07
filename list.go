@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"text/tabwriter"
@@ -9,9 +8,7 @@ import (
 
 	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/typeurl"
 	"github.com/crosbymichael/boss/monitor"
 	units "github.com/docker/go-units"
@@ -20,17 +17,14 @@ import (
 )
 
 var listCommand = cli.Command{
-	Name:  "list",
-	Usage: "list containers managed via boss",
+	Name:   "list",
+	Usage:  "list containers managed via boss",
+	Before: ReadyBefore,
 	Action: func(clix *cli.Context) error {
-		ctx := namespaces.WithNamespace(context.Background(), clix.GlobalString("namespace"))
-		client, err := containerd.New(
-			defaults.DefaultAddress,
-			containerd.WithDefaultRuntime("io.containerd.runc.v1"),
+		var (
+			ctx    = cfg.Context()
+			client = cfg.Client()
 		)
-		if err != nil {
-			return err
-		}
 		containers, err := client.Containers(ctx, fmt.Sprintf("labels.%q", monitor.StatusLabel))
 		if err != nil {
 			return err

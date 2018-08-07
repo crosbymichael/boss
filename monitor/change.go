@@ -24,7 +24,7 @@ type stopChange struct {
 }
 
 func (s *stopChange) apply(ctx context.Context, client *containerd.Client) error {
-	if err := s.m.register.EnableMaintainance(s.container.ID(), "manual stop"); err != nil {
+	if err := s.m.config.GetRegister().EnableMaintainance(s.container.ID(), "manual stop"); err != nil {
 		logrus.WithError(err).Error("setting service maintaince")
 	}
 	if err := killTask(ctx, s.container); err != nil {
@@ -48,7 +48,7 @@ func (s *startChange) apply(ctx context.Context, client *containerd.Client) erro
 	if err != nil {
 		return err
 	}
-	ip, err := s.m.networks[config.Network].Create(task)
+	ip, err := s.m.config.Network(config.Network).Create(task)
 	if err != nil {
 		if _, derr := task.Delete(ctx, containerd.WithProcessKill); derr != nil {
 			logrus.WithError(derr).Error("delete task on failed network setup")
@@ -58,7 +58,7 @@ func (s *startChange) apply(ctx context.Context, client *containerd.Client) erro
 	if ip != "" {
 		logrus.WithField("id", config.ID).WithField("ip", ip).Info("setup network interface")
 		for name, srv := range config.Services {
-			if err := s.m.register.Register(config.ID, name, ip, srv); err != nil {
+			if err := s.m.config.GetRegister().Register(config.ID, name, ip, srv); err != nil {
 				logrus.WithError(err).Error("register service")
 			}
 		}
@@ -66,7 +66,7 @@ func (s *startChange) apply(ctx context.Context, client *containerd.Client) erro
 	if err := task.Start(ctx); err != nil {
 		return err
 	}
-	if err := s.m.register.DisableMaintainance(config.ID); err != nil {
+	if err := s.m.config.GetRegister().DisableMaintainance(config.ID); err != nil {
 		logrus.WithError(err).Error("disable service maintenance")
 	}
 	return nil
@@ -130,7 +130,7 @@ func (s *deleteChange) apply(ctx context.Context, client *containerd.Client) err
 	if err != nil {
 		return err
 	}
-	s.m.register.Deregister(s.container.ID())
-	s.m.networks[config.Network].Remove(s.container)
+	s.m.config.GetRegister().Deregister(s.container.ID())
+	s.m.config.Network(config.Network).Remove(s.container)
 	return s.container.Delete(ctx, containerd.WithSnapshotCleanup)
 }

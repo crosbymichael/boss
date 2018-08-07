@@ -5,8 +5,6 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/defaults"
-	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/platforms"
 	"github.com/crosbymichael/boss/flux"
 	"github.com/sirupsen/logrus"
@@ -15,8 +13,9 @@ import (
 )
 
 var upgradeCommand = cli.Command{
-	Name:  "upgrade",
-	Usage: "upgrade a container's image but keep its data, like it should be",
+	Name:   "upgrade",
+	Usage:  "upgrade a container's image but keep its data, like it should be",
+	Before: ReadyBefore,
 	Flags: []cli.Flag{
 		cli.StringSliceFlag{
 			Name:  "platform",
@@ -29,24 +28,18 @@ var upgradeCommand = cli.Command{
 		},
 	},
 	Action: func(clix *cli.Context) error {
-		ctx := namespaces.WithNamespace(context.Background(), clix.GlobalString("namespace"))
-		client, err := containerd.New(
-			defaults.DefaultAddress,
-			containerd.WithDefaultRuntime("io.containerd.runc.v1"),
+		var (
+			id  = clix.Args().First()
+			ref = clix.Args().Get(1)
+
+			ctx    = cfg.Context()
+			client = cfg.Client()
 		)
-		if err != nil {
-			return err
-		}
-		defer client.Close()
 		ctx, done, err := client.WithLease(ctx)
 		if err != nil {
 			return err
 		}
 		defer done(ctx)
-		var (
-			id  = clix.Args().First()
-			ref = clix.Args().Get(1)
-		)
 		image, err := getImage(ctx, client, ref, clix)
 		if err != nil {
 			return err
@@ -77,7 +70,7 @@ func pauseAndRun(ctx context.Context, id string, client *containerd.Client, fn f
 	if err != nil {
 		return err
 	}
-	if err := register.EnableMaintainance(id, "upgrade image"); err != nil {
+	if err := cfg.GetRegister().EnableMaintainance(id, "upgrade image"); err != nil {
 		return err
 	}
 	if err := container.Update(ctx, withStatus(containerd.Paused)); err != nil {
@@ -87,7 +80,7 @@ func pauseAndRun(ctx context.Context, id string, client *containerd.Client, fn f
 		if err := container.Update(ctx, withStatus(containerd.Running)); err != nil {
 			logrus.WithError(err).Error("update to running")
 		}
-		if err := register.DisableMaintainance(id); err != nil {
+		if err := cfg.GetRegister().DisableMaintainance(id); err != nil {
 			logrus.WithError(err).Error("disable maintaince")
 		}
 	}()
