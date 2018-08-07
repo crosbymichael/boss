@@ -3,6 +3,7 @@ package system
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net"
 	"os"
 
@@ -61,6 +62,23 @@ func Load(path string) (*Config, error) {
 			"8.8.4.4",
 		}
 	}
+	client, err := containerd.New(
+		defaults.DefaultAddress,
+		containerd.WithDefaultRuntime(c.Runtime),
+	)
+	if err != nil {
+		return nil, err
+	}
+	c.client = client
+	if c.Iface == "" {
+		c.Iface = "eth0"
+	}
+	ip, err := getIP(c.Iface)
+	if err != nil {
+		return nil, err
+	}
+	c.ip = ip
+
 	return &c, nil
 }
 
@@ -78,15 +96,7 @@ func Ready(c *Config) error {
 			network: n,
 		}
 	}
-	client, err := containerd.New(
-		defaults.DefaultAddress,
-		containerd.WithDefaultRuntime(c.Runtime),
-	)
-	if err != nil {
-		return err
-	}
-	c.client = client
-	if c.Register == "consul" {
+	if c.Consul != nil {
 		consul, err := api.NewClient(api.DefaultConfig())
 		if err != nil {
 			return err
@@ -104,30 +114,30 @@ func Ready(c *Config) error {
 			}
 			c.Nameservers = append(c.Nameservers, host)
 		}
-
 	}
 	return nil
 }
 
 type Config struct {
-	ID          string      `toml:"id"`
-	Domain      string      `toml:"domain"`
-	Namespace   string      `toml:"namespace"`
-	Register    string      `toml:"register"`
-	Debug       bool        `toml:"debug"`
-	Runtime     string      `toml:"runtime"`
-	Agent       Agent       `toml:"agent"`
-	SSH         SSH         `toml:"ssh"`
-	Buildkit    Buildkit    `toml:"buildkit"`
-	Containerd  Containerd  `toml:"containerd"`
-	CNI         *CNI        `toml:"cni"`
-	NodeMetrics NodeMetrics `toml:"nodemetrics"`
-	Nameservers []string    `toml:"nameservers"`
+	ID          string        `toml:"id"`
+	Iface       string        `toml:"iface"`
+	Domain      string        `toml:"domain"`
+	Namespace   string        `toml:"namespace"`
+	Debug       bool          `toml:"debug"`
+	Runtime     string        `toml:"runtime"`
+	Agent       Agent         `toml:"agent"`
+	Buildkit    *Buildkit     `toml:"buildkit"`
+	CNI         *CNI          `toml:"cni"`
+	Consul      *ConsulConfig `toml:"consul"`
+	NodeMetrics *NodeMetrics  `toml:"nodemetrics"`
+	Nameservers []string      `toml:"nameservers"`
+	//SSH         SSH          `toml:"ssh"`
 
 	networks map[string]Network
 	context  context.Context
 	client   *containerd.Client
 	consul   *api.Client
+	ip       string
 }
 
 func (c *Config) Close() error {
@@ -135,6 +145,10 @@ func (c *Config) Close() error {
 		return c.client.Close()
 	}
 	return nil
+}
+
+func (c *Config) IP() string {
+	return c.ip
 }
 
 func (c *Config) Context() context.Context {
@@ -145,7 +159,7 @@ func (c *Config) Client() *containerd.Client {
 	return c.client
 }
 
-func (c *Config) Consul() *api.Client {
+func (c *Config) GetConsul() *api.Client {
 	return c.consul
 }
 
@@ -162,6 +176,11 @@ func (c *Config) Network(id string) Network {
 	return c.networks[id]
 }
 
+type ConsulConfig struct {
+	Image     string `toml:"image"`
+	Bootstrap bool   `toml:"bootstrap"`
+}
+
 type Agent struct {
 	Interval int `toml:"interval"`
 }
@@ -174,12 +193,6 @@ type SSH struct {
 type Buildkit struct {
 	Image   string `toml:"image"`
 	Enabled bool   `toml:"enabled"`
-}
-
-type Containerd struct {
-	Level          string   `toml:"level"`
-	Disable        []string `toml:"disable"`
-	MetricsAddress string   `toml:"metrics_address"`
 }
 
 type CNI struct {
@@ -205,4 +218,40 @@ type IPAM struct {
 
 type NodeMetrics struct {
 	Image string `toml:"image"`
+}
+
+var errIPAddressNotFound = errors.New("box: ip address for interface not found")
+
+func getIP(name string) (string, error) {
+	i, err := net.InterfaceByName(name)
+	if err != nil {
+		return "", err
+	}
+	return getIPf(i, ipv4)
+}
+
+func getIPf(i *net.Interface, ipfunc func(n *net.IPNet) string) (string, error) {
+	addrs, err := i.Addrs()
+	if err != nil {
+		return "", err
+	}
+	for _, a := range addrs {
+		n, ok := a.(*net.IPNet)
+		if !ok {
+			continue
+		}
+		s := ipfunc(n)
+		if s == "" {
+			continue
+		}
+		return s, nil
+	}
+	return "", errIPAddressNotFound
+}
+
+func ipv4(n *net.IPNet) string {
+	if n.IP.To4() == nil {
+		return ""
+	}
+	return n.IP.To4().String()
 }
