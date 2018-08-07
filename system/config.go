@@ -110,11 +110,7 @@ func Ready(c *Config) error {
 		}
 		c.Nameservers = nil
 		for _, n := range nodes {
-			host, _, err := net.SplitHostPort(n.Address)
-			if err != nil {
-				return err
-			}
-			c.Nameservers = append(c.Nameservers, host)
+			c.Nameservers = append(c.Nameservers, n.Address)
 		}
 	}
 	return nil

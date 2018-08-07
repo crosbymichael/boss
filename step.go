@@ -117,7 +117,7 @@ Documentation=moby/buildkit
 After=containerd.service
 
 [Service]
-ExecStart=/opt/containerd/bin/buildkitd --containerd-worker=true --oci-worker=false --addr 0.0.0.0:9000
+ExecStart=/opt/containerd/bin/buildkitd --containerd-worker=true --oci-worker=false
 Restart=always
 
 [Install]
