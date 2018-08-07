@@ -23,17 +23,35 @@ var initCommand = cli.Command{
 	},
 	Action: func(clix *cli.Context) error {
 		var steps []step
-		if cfg.NodeMetrics != nil {
-			steps = append(steps, &nodeMetricsStep{})
-			// TODO: register system services
-		}
-		if cfg.Buildkit != nil {
-			steps = append(steps, &buildkitStep{})
-		}
+		var hasConsul bool
 		if cfg.Consul != nil {
+			hasConsul = true
 			steps = append(steps, &consulStep{})
 			if ips := clix.StringSlice("join"); len(ips) > 0 {
 				steps = append(steps, &joinStep{ips: ips})
+			}
+		}
+		if cfg.NodeMetrics != nil {
+			steps = append(steps, &nodeMetricsStep{})
+			if hasConsul {
+				steps = append(steps, &registerStep{
+					id:   "node-exporter",
+					name: "node-exporter",
+					tags: []string{
+						"metrics",
+					},
+					port: 9100,
+				})
+			}
+		}
+		if cfg.Buildkit != nil {
+			steps = append(steps, &buildkitStep{})
+			if hasConsul {
+				steps = append(steps, &registerStep{
+					id:   "buildkit",
+					name: "buildkit",
+					port: 9000,
+				})
 			}
 		}
 		if cfg.CNI != nil {

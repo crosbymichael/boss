@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/containerd/containerd"
+	"github.com/hashicorp/consul/api"
 	"github.com/urfave/cli"
 )
 
@@ -102,7 +103,7 @@ Documentation=moby/buildkit
 After=containerd.service
 
 [Service]
-ExecStart=/opt/containerd/bin/buildkitd --containerd-worker=true --oci-worker=false
+ExecStart=/opt/containerd/bin/buildkitd --containerd-worker=true --oci-worker=false --addr 0.0.0.0:9000
 Restart=always
 
 [Install]
@@ -172,6 +173,28 @@ func (s *agentStep) run(ctx context.Context, client *containerd.Client, clix *cl
 		return err
 	}
 	return startNewService(name)
+}
+
+type registerStep struct {
+	id   string
+	name string
+	port int
+	tags []string
+}
+
+func (s *registerStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
+	consul, err := api.NewClient(api.DefaultConfig())
+	if err != nil {
+		return err
+	}
+	reg := &api.AgentServiceRegistration{
+		ID:      s.id,
+		Name:    s.name,
+		Tags:    s.tags,
+		Port:    s.port,
+		Address: cfg.IP(),
+	}
+	return consul.Agent().ServiceRegister(reg)
 }
 
 func install(ctx context.Context, client *containerd.Client, ref string, clix *cli.Context) error {
