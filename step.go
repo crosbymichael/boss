@@ -15,6 +15,11 @@ import (
 	"github.com/urfave/cli"
 )
 
+type step interface {
+	name() string
+	run(context.Context, *containerd.Client, *cli.Context) error
+}
+
 const consulUnit = `[Unit]
 Description=consul.io
 

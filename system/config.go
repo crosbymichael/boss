@@ -14,6 +14,7 @@ import (
 	gocni "github.com/containerd/go-cni"
 	"github.com/crosbymichael/boss/config"
 	"github.com/hashicorp/consul/api"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -68,7 +69,7 @@ func Load(path string) (*Config, error) {
 			containerd.WithDefaultRuntime(c.Runtime),
 		)
 		if err != nil {
-			return nil, err
+			logrus.WithError(err).Error("connect to containerd")
 		}
 		c.client = client
 	}
