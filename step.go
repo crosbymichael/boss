@@ -7,9 +7,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/hashicorp/consul/api"
+	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
@@ -250,7 +252,21 @@ func startNewService(name string) error {
 	if err := systemd("enable", name); err != nil {
 		return err
 	}
-	return systemd("start", name)
+	if err := systemd("start", name); err != nil {
+		return err
+	}
+	t := time.After(10 * time.Second)
+	for {
+		select {
+		case <-t:
+			return errors.Errorf("service %s not started", name)
+		default:
+			if err := systemd("status", name); err == nil {
+				return nil
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
 }
 
 func systemd(action, name string) error {

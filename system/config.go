@@ -62,14 +62,16 @@ func Load(path string) (*Config, error) {
 			"8.8.4.4",
 		}
 	}
-	client, err := containerd.New(
-		defaults.DefaultAddress,
-		containerd.WithDefaultRuntime(c.Runtime),
-	)
-	if err != nil {
-		return nil, err
+	if os.Geteuid() == 0 {
+		client, err := containerd.New(
+			defaults.DefaultAddress,
+			containerd.WithDefaultRuntime(c.Runtime),
+		)
+		if err != nil {
+			return nil, err
+		}
+		c.client = client
 	}
-	c.client = client
 	if c.Iface == "" {
 		c.Iface = "eth0"
 	}
@@ -191,8 +193,7 @@ type SSH struct {
 }
 
 type Buildkit struct {
-	Image   string `toml:"image"`
-	Enabled bool   `toml:"enabled"`
+	Image string `toml:"image"`
 }
 
 type CNI struct {

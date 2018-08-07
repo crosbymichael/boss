@@ -85,8 +85,8 @@ var initCommand = cli.Command{
 			if err := s.run(cfg.Context(), cfg.Client(), clix); err != nil {
 				return errors.Wrapf(err, "install %s", s.name())
 			}
-			bar := progress.Bar(float64(i) / total)
-			fmt.Fprintf(fw, "%s:\t%d/%d\t%40r\t\n", s.name(), i, int(total), bar)
+			bar := progress.Bar(float64(i+1) / total)
+			fmt.Fprintf(fw, "%s:\t%d/%d\t%40r\t\n", s.name(), i+1, int(total), bar)
 
 			fmt.Fprintf(fw, "elapsed: %-4.1fs\t\n",
 				time.Since(start).Seconds(),
