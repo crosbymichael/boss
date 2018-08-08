@@ -21,7 +21,6 @@ You manage it on the node.
 ## Bits and pieces
 
 * runtime: `containerd`
-* agent: `boss agent` for restarting containers, CNI networking, and registering with consul
 * cli: `boss`
 
 I use `macvlan` so all containers have private IPs on my network.

@@ -10,7 +10,6 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/typeurl"
-	"github.com/crosbymichael/boss/monitor"
 	units "github.com/docker/go-units"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -25,7 +24,7 @@ var listCommand = cli.Command{
 			ctx    = cfg.Context()
 			client = cfg.Client()
 		)
-		containers, err := client.Containers(ctx, fmt.Sprintf("labels.%q", monitor.StatusLabel))
+		containers, err := client.Containers(ctx)
 		if err != nil {
 			return err
 		}

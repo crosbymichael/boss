@@ -6,6 +6,7 @@ import (
 
 	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/system"
+	"github.com/crosbymichael/boss/systemd"
 	"github.com/urfave/cli"
 )
 
@@ -14,7 +15,7 @@ var cfg *system.Config
 func main() {
 	app := cli.NewApp()
 	app.Name = "boss"
-	app.Version = "6"
+	app.Version = "7"
 	app.Usage = "container tools for my setup"
 	app.Description = `
 
@@ -32,7 +33,6 @@ func main() {
 
 run containers like a boss`
 	app.Commands = []cli.Command{
-		agentCommand,
 		buildCommand,
 		createCommand,
 		deleteCommand,
@@ -42,6 +42,7 @@ run containers like a boss`
 		rollbackCommand,
 		startCommand,
 		stopCommand,
+		systemdCommand,
 		upgradeCommand,
 	}
 	app.Before = func(clix *cli.Context) error {
@@ -50,7 +51,10 @@ run containers like a boss`
 			return err
 		}
 		cfg = c
-		return os.MkdirAll(config.Root, 0711)
+		if err := os.MkdirAll(config.Root, 0711); err != nil {
+			return err
+		}
+		return systemd.Install()
 	}
 	app.After = func(clix *cli.Context) error {
 		if cfg == nil {

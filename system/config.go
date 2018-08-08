@@ -54,9 +54,6 @@ func Load(path string) (*Config, error) {
 		c.ID = id
 	}
 	c.context = namespaces.WithNamespace(context.Background(), c.Namespace)
-	if c.Agent.Interval == 0 {
-		c.Agent.Interval = 10
-	}
 	if len(c.Nameservers) == 0 {
 		c.Nameservers = []string{
 			"8.8.8.8",
@@ -124,7 +121,6 @@ type Config struct {
 	Namespace   string        `toml:"namespace"`
 	Debug       bool          `toml:"debug"`
 	Runtime     string        `toml:"runtime"`
-	Agent       Agent         `toml:"agent"`
 	Buildkit    *Buildkit     `toml:"buildkit"`
 	CNI         *CNI          `toml:"cni"`
 	Consul      *ConsulConfig `toml:"consul"`
@@ -178,10 +174,6 @@ func (c *Config) Network(id string) Network {
 type ConsulConfig struct {
 	Image     string `toml:"image"`
 	Bootstrap bool   `toml:"bootstrap"`
-}
-
-type Agent struct {
-	Interval int `toml:"interval"`
 }
 
 type SSH struct {

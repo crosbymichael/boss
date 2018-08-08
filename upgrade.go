@@ -73,13 +73,7 @@ func pauseAndRun(ctx context.Context, id string, client *containerd.Client, fn f
 	if err := cfg.GetRegister().EnableMaintainance(id, "upgrade image"); err != nil {
 		return err
 	}
-	if err := container.Update(ctx, withStatus(containerd.Paused)); err != nil {
-		return err
-	}
 	defer func() {
-		if err := container.Update(ctx, withStatus(containerd.Running)); err != nil {
-			logrus.WithError(err).Error("update to running")
-		}
 		if err := cfg.GetRegister().DisableMaintainance(id); err != nil {
 			logrus.WithError(err).Error("disable maintaince")
 		}

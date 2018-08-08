@@ -1,15 +1,10 @@
 package main
 
 import (
-	"context"
-
 	"github.com/BurntSushi/toml"
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/platforms"
 	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/flux"
-	"github.com/crosbymichael/boss/monitor"
 	"github.com/urfave/cli"
 )
 
@@ -45,17 +40,8 @@ var createCommand = cli.Command{
 			ctx,
 			container.ID,
 			config.WithBossConfig(&container, image),
-			withStatus(containerd.Running),
 			flux.WithNewSnapshot(image),
 		)
 		return err
 	},
-}
-
-func withStatus(status containerd.ProcessStatus) func(context.Context, *containerd.Client, *containers.Container) error {
-	return func(_ context.Context, _ *containerd.Client, c *containers.Container) error {
-		ensureLabels(c)
-		c.Labels[monitor.StatusLabel] = string(status)
-		return nil
-	}
 }

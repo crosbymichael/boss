@@ -78,7 +78,6 @@ var initCommand = cli.Command{
 				steps = append(steps, &dhcpStep{})
 			}
 		}
-		steps = append(steps, &agentStep{})
 		if hasConsul {
 			steps = append(steps, &registerStep{
 				id: "containerd",
@@ -193,7 +192,7 @@ var containerdCommand = cli.Command{
 		if err := writeUnit(name, containerdUnit); err != nil {
 			return err
 		}
-		if err := startNewService(name); err != nil {
+		if err := startNewService(ctx, name); err != nil {
 			return err
 		}
 		client, err := containerd.New(

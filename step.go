@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	"github.com/crosbymichael/boss/systemd"
 	"github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
@@ -68,7 +69,7 @@ func (s *consulStep) run(ctx context.Context, client *containerd.Client, clix *c
 	}
 	err = t.Execute(f, tmplCtx)
 	f.Close()
-	return startNewService(name)
+	return startNewService(ctx, name)
 }
 
 type joinStep struct {
@@ -113,7 +114,7 @@ func (s *nodeMetricsStep) run(ctx context.Context, client *containerd.Client, cl
 	if err := writeUnit(name, metricsUnit); err != nil {
 		return err
 	}
-	return startNewService(name)
+	return startNewService(ctx, name)
 }
 
 const buildkitUnit = `[Unit]
@@ -143,7 +144,7 @@ func (s *buildkitStep) run(ctx context.Context, client *containerd.Client, clix 
 	if err := writeUnit(name, buildkitUnit); err != nil {
 		return err
 	}
-	return startNewService(name)
+	return startNewService(ctx, name)
 }
 
 type cniStep struct {
@@ -180,34 +181,7 @@ func (s *dhcpStep) run(ctx context.Context, client *containerd.Client, clix *cli
 	if err := writeUnit(name, dhcpUnit); err != nil {
 		return err
 	}
-	return startNewService(name)
-}
-
-const agentUnit = `[Unit]
-Description=boss agent
-Requires=containerd.service
-After=containerd.service
-
-[Service]
-ExecStart=/usr/local/bin/boss agent
-Restart=always
-
-[Install]
-WantedBy=multi-user.target`
-
-type agentStep struct {
-}
-
-func (s *agentStep) name() string {
-	return "install agent"
-}
-
-func (s *agentStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
-	const name = "boss-agent.service"
-	if err := writeUnit(name, agentUnit); err != nil {
-		return err
-	}
-	return startNewService(name)
+	return startNewService(ctx, name)
 }
 
 type registerStep struct {
@@ -253,11 +227,11 @@ func writeUnit(name, data string) error {
 	return err
 }
 
-func startNewService(name string) error {
-	if err := systemd("enable", name); err != nil {
+func startNewService(ctx context.Context, name string) error {
+	if err := systemd.Command(ctx, "enable", name); err != nil {
 		return err
 	}
-	if err := systemd("start", name); err != nil {
+	if err := systemd.Command(ctx, "start", name); err != nil {
 		return err
 	}
 	t := time.After(10 * time.Second)
@@ -266,19 +240,10 @@ func startNewService(name string) error {
 		case <-t:
 			return errors.Errorf("service %s not started", name)
 		default:
-			if err := systemd("status", name); err == nil {
+			if err := systemd.Command(ctx, "status", name); err == nil {
 				return nil
 			}
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
-}
-
-func systemd(action, name string) error {
-	cmd := exec.Command("systemctl", action, name)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%s %s", err, out)
-	}
-	return nil
 }

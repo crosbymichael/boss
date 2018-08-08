@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/containerd/containerd"
+	"github.com/crosbymichael/boss/systemd"
 	"github.com/urfave/cli"
 )
 
@@ -11,26 +11,9 @@ var stopCommand = cli.Command{
 	Before: ReadyBefore,
 	Action: func(clix *cli.Context) error {
 		var (
-			id     = clix.Args().First()
-			ctx    = cfg.Context()
-			client = cfg.Client()
+			id  = clix.Args().First()
+			ctx = cfg.Context()
 		)
-		container, err := client.LoadContainer(ctx, id)
-		if err != nil {
-			return err
-		}
-		task, err := container.Task(ctx, nil)
-		if err != nil {
-			return err
-		}
-		wait, err := task.Wait(ctx)
-		if err != nil {
-			return err
-		}
-		if err := container.Update(ctx, withStatus(containerd.Stopped)); err != nil {
-			return err
-		}
-		<-wait
-		return nil
+		return systemd.Stop(ctx, id)
 	},
 }

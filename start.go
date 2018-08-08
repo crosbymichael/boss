@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/containerd/containerd"
+	"github.com/crosbymichael/boss/systemd"
 	"github.com/urfave/cli"
 )
 
@@ -11,14 +11,9 @@ var startCommand = cli.Command{
 	Before: ReadyBefore,
 	Action: func(clix *cli.Context) error {
 		var (
-			id     = clix.Args().First()
-			ctx    = cfg.Context()
-			client = cfg.Client()
+			id  = clix.Args().First()
+			ctx = cfg.Context()
 		)
-		container, err := client.LoadContainer(ctx, id)
-		if err != nil {
-			return err
-		}
-		return container.Update(ctx, withStatus(containerd.Running))
+		return systemd.Start(ctx, id)
 	},
 }

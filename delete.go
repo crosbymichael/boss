@@ -1,7 +1,8 @@
 package main
 
 import (
-	"github.com/crosbymichael/boss/monitor"
+	"github.com/containerd/containerd"
+	"github.com/crosbymichael/boss/systemd"
 	"github.com/urfave/cli"
 )
 
@@ -15,6 +16,13 @@ var deleteCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		return container.Update(cfg.Context(), withStatus(monitor.DeleteStatus))
+		ctx := cfg.Context()
+		if err := systemd.Stop(ctx, id); err != nil {
+			return err
+		}
+		if err := systemd.Disable(ctx, id); err != nil {
+			return err
+		}
+		return container.Delete(ctx, containerd.WithSnapshotCleanup)
 	},
 }
