@@ -1,246 +1,236 @@
 package main
 
 import (
+	"archive/tar"
 	"context"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
-	"text/template"
 	"time"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/archive"
+	"github.com/containerd/containerd/archive/compression"
+	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/content/local"
 	"github.com/containerd/containerd/defaults"
-	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/pkg/progress"
+	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/containerd/remotes"
+	"github.com/containerd/containerd/remotes/docker"
+	"github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
-
-type agentContext struct {
-	Interval    string
-	Nameservers []string
-	Register    string
-}
-
-func (a *agentContext) nameservers() string {
-	var p []string
-	for _, n := range a.Nameservers {
-		p = append(p, "--nameservers", n)
-	}
-	return strings.Join(p, " ")
-}
-
-const agentTemplate = `[Unit]
-Description=boss agent
-Requires=containerd.service
-After=containerd.service
-
-[Service]
-ExecStart=/usr/local/bin/boss --register {{.Register}} agent --interval {{.Interval}} {{nameservers}}
-Restart=always
-
-[Install]
-WantedBy=multi-user.target`
-
-const buildkitTemplate = `[Unit]
-Description=buildkit
-Documentation=moby/buildkit
-After=containerd.service
-
-[Service]
-ExecStart=/opt/containerd/bin/buildkitd --containerd-worker=true --oci-worker=false
-Restart=always
-
-[Install]
-WantedBy=multi-user.target`
-
-const dhcpTemplate = `[Unit]
-Description=cni dhcp server
-
-[Service]
-ExecStartPre=/bin/rm -f /run/cni/dhcp.sock
-ExecStart=/opt/containerd/bin/dhcp daemon
-Restart=always
-
-[Install]
-WantedBy=multi-user.target`
 
 var initCommand = cli.Command{
 	Name:  "init",
 	Usage: "init boss on a system",
-	Subcommands: []cli.Command{
-		initAgentCommand,
-		initBuildkitCommand,
-		initCNICommand,
-	},
-}
-
-var initAgentCommand = cli.Command{
-	Name:  "agent",
-	Usage: "init boss agent on a system",
 	Flags: []cli.Flag{
-		cli.DurationFlag{
-			Name:  "interval,i",
-			Usage: "set the interval to reconcile state",
-			Value: 10 * time.Second,
-		},
 		cli.StringSliceFlag{
-			Name:  "nameservers,n",
-			Usage: "set the boss nameservers",
-			Value: &cli.StringSlice{
-				"8.8.8.8",
-				"8.8.4.4",
-			},
-		},
-	},
-	Action: func(clix *cli.Context) error {
-		ac := &agentContext{
-			Interval:    clix.Duration("interval").String(),
-			Nameservers: clix.StringSlice("nameservers"),
-			Register:    clix.GlobalString("register"),
-		}
-		t, err := template.New("agent").Funcs(template.FuncMap{
-			"nameservers": ac.nameservers,
-		}).Parse(agentTemplate)
-		if err != nil {
-			return err
-		}
-		f, err := os.Create(filepath.Join("/lib/systemd/system", "boss-agent.service"))
-		if err != nil {
-			return err
-		}
-		err = t.Execute(f, ac)
-		f.Close()
-		if err != nil {
-			return err
-		}
-		if err := systemd("enable", "boss-agent"); err != nil {
-			return err
-		}
-		return systemd("start", "boss-agent")
-	},
-}
-
-var initBuildkitCommand = cli.Command{
-	Name:  "buildkit",
-	Usage: "init buildkit on a system",
-	Action: func(clix *cli.Context) error {
-		ctx := namespaces.WithNamespace(context.Background(), clix.GlobalString("namespace"))
-		client, err := containerd.New(
-			defaults.DefaultAddress,
-			containerd.WithDefaultRuntime("io.containerd.runc.v1"),
-		)
-		if err != nil {
-			return err
-		}
-		defer client.Close()
-		image, err := getImage(ctx, client, "docker.io/crosbymichael/buildkit:latest", clix)
-		if err != nil {
-			return err
-		}
-		if err := client.Install(ctx, image); err != nil {
-			return err
-		}
-		f, err := os.Create(filepath.Join("/lib/systemd/system", "buildkit.service"))
-		if err != nil {
-			return err
-		}
-		_, err = f.WriteString(buildkitTemplate)
-		f.Close()
-		if err != nil {
-			return err
-		}
-		if err := systemd("enable", "buildkit"); err != nil {
-			return err
-		}
-		return systemd("start", "buildkit")
-	},
-}
-
-var initCNICommand = cli.Command{
-	Name:  "cni",
-	Usage: "init cni on a system",
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "dhcp",
-			Usage: "start the dhcp server",
-		},
-		cli.StringSliceFlag{
-			Name:  "networks",
-			Usage: "add cni network configurations",
+			Name:  "join",
+			Usage: "list of consul servers to join",
 			Value: &cli.StringSlice{},
 		},
 	},
+	Subcommands: []cli.Command{
+		containerdCommand,
+	},
 	Action: func(clix *cli.Context) error {
-		ctx := namespaces.WithNamespace(context.Background(), clix.GlobalString("namespace"))
+		var (
+			steps     []step
+			hasConsul bool
+			start     = time.Now()
+		)
+		if cfg.Consul != nil {
+			hasConsul = true
+			steps = append(steps, &consulStep{})
+			if ips := clix.StringSlice("join"); len(ips) > 0 {
+				steps = append(steps, &joinStep{ips: ips})
+			}
+		}
+		if cfg.NodeMetrics != nil {
+			steps = append(steps, &nodeMetricsStep{})
+			if hasConsul {
+				steps = append(steps, &registerStep{
+					id: "node-exporter",
+					tags: []string{
+						"metrics",
+					},
+					port: 9100,
+				})
+			}
+		}
+		if cfg.Buildkit != nil {
+			steps = append(steps, &buildkitStep{})
+			if hasConsul {
+				steps = append(steps, &registerStep{
+					id:   "buildkit",
+					port: 9000,
+				})
+			}
+		}
+		if cfg.CNI != nil {
+			steps = append(steps, &cniStep{})
+			if cfg.CNI.IPAM.Type == "dhcp" {
+				steps = append(steps, &dhcpStep{})
+			}
+		}
+		steps = append(steps, &agentStep{})
+		if hasConsul {
+			steps = append(steps, &registerStep{
+				id: "containerd",
+				tags: []string{
+					"metrics",
+				},
+				port: 9200,
+			})
+		}
+		var (
+			fw    = progress.NewWriter(os.Stderr)
+			total = float64(len(steps))
+		)
+		for i, s := range steps {
+			if err := s.run(cfg.Context(), cfg.Client(), clix); err != nil {
+				return errors.Wrapf(err, "install %s", s.name())
+			}
+			bar := progress.Bar(float64(i+1) / total)
+			fmt.Fprintf(fw, "%s:\t%d/%d\t%40r\t\n", s.name(), i+1, int(total), bar)
+
+			fmt.Fprintf(fw, "elapsed: %-4.1fs\t\n",
+				time.Since(start).Seconds(),
+			)
+			fw.Flush()
+		}
+		return nil
+	},
+}
+
+const containerdUnit = `[Unit]
+Description=containerd container runtime
+Documentation=https://containerd.io
+After=network.target
+
+[Service]
+ExecStartPre=/sbin/modprobe overlay
+ExecStart=/usr/local/bin/containerd
+Delegate=yes
+KillMode=process
+LimitNOFILE=1048576
+# Having non-zero Limit*s causes performance problems due to accounting overhead
+# in the kernel. We recommend using cgroups to do container-local accounting.
+LimitNPROC=infinity
+LimitCORE=infinity
+
+[Install]
+WantedBy=multi-user.target`
+
+const containerdConfig = `disabled_plugins = ["cri"]
+
+[metrics]
+        address = "0.0.0.0:9200"
+        grpc_histogram = true
+
+[plugins.cgroups]
+        no_prom = false`
+
+var containerdCommand = cli.Command{
+	Name:  "containerd",
+	Usage: "install containerd on a system",
+	Action: func(clix *cli.Context) error {
+		dir, err := ioutil.TempDir("", "containerd-install")
+		if err != nil {
+			return err
+		}
+		defer os.RemoveAll(dir)
+		ctx := cfg.Context()
+		cs, err := local.NewStore(dir)
+		if err != nil {
+			return err
+		}
+		desc, err := localFetch(ctx, cs)
+		if err != nil {
+			return err
+		}
+		platform := platforms.Default()
+		manifest, err := images.Manifest(ctx, cs, *desc, platform)
+		if err != nil {
+			return err
+		}
+		for _, layer := range manifest.Layers {
+			ra, err := cs.ReaderAt(ctx, layer)
+			if err != nil {
+				return err
+			}
+			cr := content.NewReader(ra)
+			r, err := compression.DecompressStream(cr)
+			if err != nil {
+				return err
+			}
+			defer r.Close()
+			if _, err := archive.Apply(ctx, "/usr/local", r, archive.WithFilter(func(hdr *tar.Header) (bool, error) {
+				d := filepath.Dir(hdr.Name)
+				return d == "bin", nil
+			})); err != nil {
+				return err
+			}
+		}
+		if err := os.MkdirAll("/etc/containerd", 0711); err != nil {
+			return err
+		}
+		f, err := os.Create(filepath.Join("/etc/containerd/config.toml"))
+		if err != nil {
+			return err
+		}
+		_, err = f.WriteString(containerdConfig)
+		f.Close()
+		if err != nil {
+			return err
+		}
+		const name = "containerd.service"
+		if err := writeUnit(name, containerdUnit); err != nil {
+			return err
+		}
+		if err := startNewService(name); err != nil {
+			return err
+		}
 		client, err := containerd.New(
 			defaults.DefaultAddress,
-			containerd.WithDefaultRuntime("io.containerd.runc.v1"),
+			containerd.WithDefaultRuntime(cfg.Runtime),
 		)
 		if err != nil {
 			return err
 		}
 		defer client.Close()
-		image, err := getImage(ctx, client, "docker.io/crosbymichael/cni:latest", clix)
+
+		image, err := getImage(ctx, client, "docker.io/crosbymichael/runc:latest", clix)
 		if err != nil {
 			return err
 		}
-		if err := client.Install(ctx, image); err != nil {
-			return err
-		}
-		if err := installNetworks(clix.StringSlice("networks")); err != nil {
-			return err
-		}
-		if !clix.Bool("dhcp") {
-			return nil
-		}
-		f, err := os.Create(filepath.Join("/lib/systemd/system", "cni-dhcp.service"))
-		if err != nil {
-			return err
-		}
-		_, err = f.WriteString(dhcpTemplate)
-		f.Close()
-		if err != nil {
-			return err
-		}
-		if err := systemd("enable", "cni-dhcp"); err != nil {
-			return err
-		}
-		return systemd("start", "cni-dhcp")
+		return client.Install(ctx, image, containerd.WithInstallReplace, containerd.WithInstallLibs)
 	},
 }
 
-func installNetworks(networks []string) error {
-	path := "/etc/cni/net.d"
-	if err := os.MkdirAll(path, 0711); err != nil {
-		return err
-	}
-	for _, name := range networks {
-		f, err := os.Create(filepath.Join(path, name))
-		if err != nil {
-			return err
-		}
-		data, err := os.Open(name)
-		if err != nil {
-			f.Close()
-			return err
-		}
-		if _, err := io.Copy(f, data); err != nil {
-			f.Close()
-			data.Close()
-		}
-		f.Close()
-		data.Close()
-	}
-	return nil
-}
-
-func systemd(action, name string) error {
-	cmd := exec.Command("systemctl", action, name)
-	out, err := cmd.CombinedOutput()
+func localFetch(ctx context.Context, cs content.Store) (*v1.Descriptor, error) {
+	resolv := docker.NewResolver(docker.ResolverOptions{})
+	name, desc, err := resolv.Resolve(ctx, "docker.io/crosbymichael/containerd:latest")
 	if err != nil {
-		return fmt.Errorf("%s %s", err, out)
+		return nil, err
 	}
-	return nil
+	f, err := resolv.Fetcher(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	r, err := f.Fetch(ctx, desc)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	h := remotes.FetchHandler(cs, f)
+	if err := images.Dispatch(ctx, h, desc); err != nil {
+		return nil, err
+	}
+	return &desc, nil
 }

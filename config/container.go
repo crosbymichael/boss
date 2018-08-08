@@ -18,21 +18,13 @@ import (
 )
 
 const (
-	Root      = "/var/lib/boss"
 	Extension = "io.boss/container"
+	Root      = "/var/lib/boss"
 )
 
 func init() {
 	typeurl.Register(&Container{}, "io.boss.v1.Container")
 }
-
-type NetworkType string
-
-const (
-	Host NetworkType = "host"
-	CNI  NetworkType = "cni"
-	None NetworkType = ""
-)
 
 type Container struct {
 	ID        string             `toml:"id"`
@@ -43,7 +35,7 @@ type Container struct {
 	Env       []string           `toml:"env"`
 	Args      []string           `toml:"args"`
 	Labels    []string           `toml:"labels"`
-	Network   NetworkType        `toml:"network"`
+	Network   string             `toml:"network"`
 	Services  map[string]Service `toml:"services"`
 }
 
@@ -73,7 +65,7 @@ func (config *Container) specOpt(image containerd.Image) oci.SpecOpts {
 		oci.WithEnv(config.Env),
 		withMounts(config.Mounts),
 	}
-	if config.Network == Host {
+	if config.Network == "host" {
 		opts = append(opts, oci.WithHostHostsFile, oci.WithHostResolvconf, oci.WithHostNamespace(specs.NetworkNamespace))
 	} else {
 		opts = append(opts, withBossResolvconf, withContainerHostsFile)

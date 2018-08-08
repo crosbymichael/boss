@@ -9,8 +9,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/namespaces"
-	"github.com/crosbymichael/boss/config"
+	"github.com/crosbymichael/boss/system"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
@@ -21,35 +20,19 @@ const (
 	DeleteStatus containerd.ProcessStatus = "delete"
 )
 
-// Register is an object that registers and manages service information in its backend
-type Register interface {
-	Register(id, name, ip string, s config.Service) error
-	Deregister(id string) error
-	EnableMaintainance(id, msg string) error
-	DisableMaintainance(id string) error
-}
-
-type Network interface {
-	Create(containerd.Task) (string, error)
-	Remove(containerd.Container) error
-}
-
 // New returns a new monitor for containers
-func New(client *containerd.Client, register Register, networks map[config.NetworkType]Network) *Monitor {
+func New(cfg *system.Config) *Monitor {
 	return &Monitor{
-		client:     client,
-		register:   register,
-		networks:   networks,
+		config:     cfg,
 		shutdownCh: make(chan struct{}, 1),
 	}
 }
 
 type Monitor struct {
-	client     *containerd.Client
-	register   Register
-	networks   map[config.NetworkType]Network
+	mu sync.Mutex
+
+	config     *system.Config
 	shutdownCh chan struct{}
-	mu         sync.Mutex
 }
 
 func (m *Monitor) Stop() {
@@ -60,24 +43,14 @@ func (m *Monitor) Shutdown() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	ctx := context.Background()
-	ns, err := m.client.NamespaceService().List(ctx)
-	if err != nil {
-		logrus.WithError(err).Error("list namespaces")
-		close(m.shutdownCh)
-		return
-	}
-	for _, name := range ns {
-		ctx = namespaces.WithNamespace(ctx, name)
-		if err := m.stopContainers(ctx); err != nil {
-			logrus.WithError(err).Errorf("attach task in %s", name)
-		}
+	if err := m.stopContainers(m.config.Context()); err != nil {
+		logrus.WithError(err).Error("stop tasks")
 	}
 	close(m.shutdownCh)
 }
 
 func (m *Monitor) stopContainers(ctx context.Context) error {
-	containers, err := m.client.Containers(ctx, fmt.Sprintf("labels.%q", StatusLabel))
+	containers, err := m.config.Client().Containers(ctx, fmt.Sprintf("labels.%q", StatusLabel))
 	if err != nil {
 		return err
 	}
@@ -117,22 +90,11 @@ func (m *Monitor) stopContainers(ctx context.Context) error {
 }
 
 func (m *Monitor) Attach() error {
-	ctx := context.Background()
-	ns, err := m.client.NamespaceService().List(ctx)
-	if err != nil {
-		return err
-	}
-	for _, name := range ns {
-		ctx = namespaces.WithNamespace(ctx, name)
-		if err := m.attachContainers(ctx); err != nil {
-			logrus.WithError(err).Errorf("attach task in %s", name)
-		}
-	}
-	return nil
+	return m.attachContainers(m.config.Context())
 }
 
 func (m *Monitor) attachContainers(ctx context.Context) error {
-	containers, err := m.client.Containers(ctx, fmt.Sprintf("labels.%q", StatusLabel))
+	containers, err := m.config.Client().Containers(ctx, fmt.Sprintf("labels.%q", StatusLabel))
 	if err != nil {
 		return err
 	}
@@ -153,20 +115,17 @@ func (m *Monitor) attachContainers(ctx context.Context) error {
 	return nil
 }
 
-func (m *Monitor) Run(interval time.Duration) {
-	if interval == 0 {
-		interval = 10 * time.Second
-	}
+func (m *Monitor) Run() error {
 	for {
-		time.Sleep(interval)
+		time.Sleep(time.Duration(m.config.Agent.Interval) * time.Second)
 
 		m.mu.Lock()
 		select {
 		case <-m.shutdownCh:
 			logrus.Debug("ending reconcile loop for shutdown")
-			return
+			return nil
 		default:
-			if err := m.reconcile(context.Background()); err != nil {
+			if err := m.reconcile(m.config.Context()); err != nil {
 				logrus.WithError(err).Error("reconcile")
 			}
 		}
@@ -175,28 +134,20 @@ func (m *Monitor) Run(interval time.Duration) {
 }
 
 func (m *Monitor) reconcile(ctx context.Context) error {
-	ns, err := m.client.NamespaceService().List(ctx)
+	changes, err := m.monitor(ctx)
 	if err != nil {
 		return err
 	}
-	for _, name := range ns {
-		ctx = namespaces.WithNamespace(ctx, name)
-		changes, err := m.monitor(ctx)
-		if err != nil {
-			logrus.WithError(err).Error("get changes")
-			continue
-		}
-		for _, c := range changes {
-			if err := c.apply(ctx, m.client); err != nil {
-				logrus.WithError(err).Error("apply change")
-			}
+	for _, c := range changes {
+		if err := c.apply(ctx, m.config.Client()); err != nil {
+			logrus.WithError(err).Error("apply change")
 		}
 	}
 	return nil
 }
 
 func (m *Monitor) monitor(ctx context.Context) ([]change, error) {
-	containers, err := m.client.Containers(ctx, fmt.Sprintf("labels.%q", StatusLabel))
+	containers, err := m.config.Client().Containers(ctx, fmt.Sprintf("labels.%q", StatusLabel))
 	if err != nil {
 		return nil, err
 	}

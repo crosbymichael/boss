@@ -6,8 +6,6 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/defaults"
-	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/platforms"
 	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/flux"
@@ -16,8 +14,9 @@ import (
 )
 
 var createCommand = cli.Command{
-	Name:  "create",
-	Usage: "create a container",
+	Name:   "create",
+	Usage:  "create a container",
+	Before: ReadyBefore,
 	Flags: []cli.Flag{
 		cli.StringSliceFlag{
 			Name:  "platform",
@@ -34,15 +33,10 @@ var createCommand = cli.Command{
 		if _, err := toml.DecodeFile(clix.Args().First(), &container); err != nil {
 			return err
 		}
-		ctx := namespaces.WithNamespace(context.Background(), clix.GlobalString("namespace"))
-		client, err := containerd.New(
-			defaults.DefaultAddress,
-			containerd.WithDefaultRuntime("io.containerd.runc.v1"),
+		var (
+			ctx    = cfg.Context()
+			client = cfg.Client()
 		)
-		if err != nil {
-			return err
-		}
-		defer client.Close()
 		image, err := getImage(ctx, client, container.Image, clix)
 		if err != nil {
 			return err
