@@ -222,7 +222,7 @@ var containerdCommand = cli.Command{
 		}
 		defer client.Close()
 
-		image, err := getImage(ctx, client, "docker.io/crosbymichael/runc:latest", clix)
+		image, err := getImage(ctx, client, "docker.io/crosbymichael/runc:latest", clix, false)
 		if err != nil {
 			return err
 		}

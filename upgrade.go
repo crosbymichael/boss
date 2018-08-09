@@ -43,7 +43,7 @@ var upgradeCommand = cli.Command{
 			return err
 		}
 		defer done(ctx)
-		image, err := getImage(ctx, client, ref, clix)
+		image, err := getImage(ctx, client, ref, clix, true)
 		if err != nil {
 			return err
 		}

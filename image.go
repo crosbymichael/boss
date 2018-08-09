@@ -9,7 +9,7 @@ import (
 	"github.com/urfave/cli"
 )
 
-func getImage(ctx context.Context, client *containerd.Client, ref string, clix *cli.Context) (containerd.Image, error) {
+func getImage(ctx context.Context, client *containerd.Client, ref string, clix *cli.Context, unpack bool) (containerd.Image, error) {
 	image, err := client.GetImage(ctx, ref)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
@@ -21,8 +21,10 @@ func getImage(ctx context.Context, client *containerd.Client, ref string, clix *
 		if image, err = client.GetImage(ctx, ref); err != nil {
 			return nil, err
 		}
-		if err := image.Unpack(ctx, containerd.DefaultSnapshotter); err != nil {
-			return nil, err
+		if unpack {
+			if err := image.Unpack(ctx, containerd.DefaultSnapshotter); err != nil {
+				return nil, err
+			}
 		}
 	}
 	return image, nil

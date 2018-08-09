@@ -35,7 +35,7 @@ var createCommand = cli.Command{
 			return err
 		}
 		defer client.Close()
-		image, err := getImage(ctx, client, container.Image, clix)
+		image, err := getImage(ctx, client, container.Image, clix, true)
 		if err != nil {
 			return err
 		}
