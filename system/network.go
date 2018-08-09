@@ -32,11 +32,11 @@ func (n *cni) Remove(_ containerd.Container) error {
 }
 
 type host struct {
+	ip string
 }
 
 func (n *host) Create(_ containerd.Task) (string, error) {
-	// TODO: get default route's ip
-	return "", nil
+	return n.ip, nil
 }
 
 func (n *host) Remove(_ containerd.Container) error {

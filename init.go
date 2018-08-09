@@ -40,8 +40,8 @@ var initCommand = cli.Command{
 	},
 	Action: func(clix *cli.Context) error {
 		var (
-			steps     []step
 			hasConsul bool
+			steps     []step
 			start     = time.Now()
 		)
 		if cfg.Consul != nil {

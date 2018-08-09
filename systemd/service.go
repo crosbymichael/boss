@@ -18,13 +18,15 @@ const (
 const service = `
 [Unit]
 Description=Boss container proxy for %i
-After=containerd.service
+Wants=network-online.target
+After=network-online.target containerd.service
 
 [Service]
 ExecStartPre=/usr/local/bin/boss systemd exec-start-pre %i
 ExecStart=/usr/local/bin/boss systemd exec-start %i
 ExecStartPost=/usr/local/bin/boss systemd exec-start-post %i
 Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target

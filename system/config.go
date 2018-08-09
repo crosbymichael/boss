@@ -73,18 +73,16 @@ func Load(path string) (*Config, error) {
 	if c.Iface == "" {
 		c.Iface = "eth0"
 	}
-	ip, err := getIP(c.Iface)
-	if err != nil {
-		return nil, err
-	}
-	c.ip = ip
-
 	return &c, nil
 }
 
 func Ready(c *Config) error {
+	ip, err := GetIP(c.Iface)
+	if err != nil {
+		return err
+	}
 	c.networks = make(map[string]Network)
-	c.networks["host"] = &host{}
+	c.networks["host"] = &host{ip: ip}
 	c.networks["none"] = &none{}
 	c.networks[""] = &none{}
 	if c.CNI != nil {
@@ -140,10 +138,6 @@ func (c *Config) Close() error {
 		return c.client.Close()
 	}
 	return nil
-}
-
-func (c *Config) IP() string {
-	return c.ip
 }
 
 func (c *Config) Context() context.Context {
@@ -210,9 +204,9 @@ type NodeMetrics struct {
 	Image string `toml:"image"`
 }
 
-var errIPAddressNotFound = errors.New("box: ip address for interface not found")
+var ErrIPAddressNotFound = errors.New("box: ip address for interface not found")
 
-func getIP(name string) (string, error) {
+func GetIP(name string) (string, error) {
 	i, err := net.InterfaceByName(name)
 	if err != nil {
 		return "", err
@@ -236,7 +230,7 @@ func getIPf(i *net.Interface, ipfunc func(n *net.IPNet) string) (string, error) 
 		}
 		return s, nil
 	}
-	return "", errIPAddressNotFound
+	return "", ErrIPAddressNotFound
 }
 
 func ipv4(n *net.IPNet) string {

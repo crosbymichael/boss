@@ -2,14 +2,13 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"html/template"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"time"
 
 	"github.com/containerd/containerd"
+	"github.com/crosbymichael/boss/system"
 	"github.com/crosbymichael/boss/systemd"
 	"github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
@@ -46,6 +45,10 @@ func (s *consulStep) run(ctx context.Context, client *containerd.Client, clix *c
 	if err := os.MkdirAll("/var/lib/consul", 0711); err != nil {
 		return err
 	}
+	ip, err := system.GetIP(cfg.Iface)
+	if err != nil {
+		return err
+	}
 	var tmplCtx = struct {
 		Bootstrap string
 		Domain    string
@@ -54,7 +57,7 @@ func (s *consulStep) run(ctx context.Context, client *containerd.Client, clix *c
 	}{
 		ID:     cfg.ID,
 		Domain: cfg.Domain,
-		IP:     cfg.IP(),
+		IP:     ip,
 	}
 	if cfg.Consul.Bootstrap {
 		tmplCtx.Bootstrap = "-bootstrap"
@@ -81,10 +84,14 @@ func (s *joinStep) name() string {
 }
 
 func (s *joinStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
-	cmd := exec.CommandContext(ctx, "consul", append([]string{"join"}, s.ips...)...)
-	out, err := cmd.CombinedOutput()
+	consul, err := api.NewClient(api.DefaultConfig())
 	if err != nil {
-		return fmt.Errorf("%s %s", err, out)
+		return err
+	}
+	for _, ip := range s.ips {
+		if err := consul.Agent().Join(ip, false); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -184,6 +191,17 @@ func (s *dhcpStep) run(ctx context.Context, client *containerd.Client, clix *cli
 	return startNewService(ctx, name)
 }
 
+type networkWaitStep struct {
+}
+
+func (s *networkWaitStep) name() string {
+	return "network wait on boot"
+}
+
+func (s *networkWaitStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
+	return systemd.Enable(ctx, "systemd-networkd-wait-online.service")
+}
+
 type registerStep struct {
 	id   string
 	port int
@@ -195,6 +213,10 @@ func (s *registerStep) name() string {
 }
 
 func (s *registerStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
+	ip, err := system.GetIP(cfg.Iface)
+	if err != nil {
+		return err
+	}
 	consul, err := api.NewClient(api.DefaultConfig())
 	if err != nil {
 		return err
@@ -204,7 +226,7 @@ func (s *registerStep) run(ctx context.Context, client *containerd.Client, clix 
 		Name:    s.id,
 		Tags:    s.tags,
 		Port:    s.port,
-		Address: cfg.IP(),
+		Address: ip,
 	}
 	return consul.Agent().ServiceRegister(reg)
 }
