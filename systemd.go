@@ -31,6 +31,7 @@ var systemdCommand = cli.Command{
 	Name:   "systemd",
 	Usage:  "systemd proxy for containers",
 	Hidden: true,
+	Before: systemdPreSetup,
 	Subcommands: []cli.Command{
 		systemdExecStartPreCommand,
 		systemdExecStartCommand,
@@ -39,9 +40,8 @@ var systemdCommand = cli.Command{
 }
 
 var systemdExecStartPreCommand = cli.Command{
-	Name:   "exec-start-pre",
-	Usage:  "exec-start-pre proxy for containers",
-	Before: systemdPreSetup,
+	Name:  "exec-start-pre",
+	Usage: "exec-start-pre proxy for containers",
 	Action: func(clix *cli.Context) error {
 		id := clix.Args().First()
 		if err := setupResolvConf(); err != nil {
@@ -55,23 +55,19 @@ var systemdExecStartPreCommand = cli.Command{
 }
 
 var systemdExecStartPostCommand = cli.Command{
-	Name:   "exec-start-post",
-	Usage:  "exec-start-post proxy for containers",
-	Before: systemdPreSetup,
+	Name:  "exec-start-post",
+	Usage: "exec-start-post proxy for containers",
 	Action: func(clix *cli.Context) error {
 		id := clix.Args().First()
 		err := cleanupPreviousTask(id)
-		if merr := cfg.GetRegister().EnableMaintainance(id, "task exited"); err == nil {
-			err = merr
-		}
+		cfg.GetRegister().EnableMaintainance(id, "task exited")
 		return err
 	},
 }
 
 var systemdExecStartCommand = cli.Command{
-	Name:   "exec-start",
-	Usage:  "exec-start proxy for containers",
-	Before: systemdPreSetup,
+	Name:  "exec-start",
+	Usage: "exec-start proxy for containers",
 	Action: func(clix *cli.Context) error {
 		id := clix.Args().First()
 		var (

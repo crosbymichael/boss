@@ -51,6 +51,9 @@ run containers like a boss`
 			return err
 		}
 		cfg = c
+		if os.Geteuid() != 0 {
+			return nil
+		}
 		if err := os.MkdirAll(config.Root, 0711); err != nil {
 			return err
 		}

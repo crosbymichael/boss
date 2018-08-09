@@ -5,6 +5,7 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/flux"
+	"github.com/crosbymichael/boss/systemd"
 	"github.com/urfave/cli"
 )
 
@@ -36,12 +37,17 @@ var createCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		_, err = client.NewContainer(
+		if _, err := client.NewContainer(
 			ctx,
 			container.ID,
 			config.WithBossConfig(&container, image),
 			flux.WithNewSnapshot(image),
-		)
-		return err
+		); err != nil {
+			return err
+		}
+		if err := systemd.Enable(ctx, container.ID); err != nil {
+			return err
+		}
+		return systemd.Start(ctx, container.ID)
 	},
 }
