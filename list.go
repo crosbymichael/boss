@@ -10,20 +10,22 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/typeurl"
+	"github.com/crosbymichael/boss/system"
 	units "github.com/docker/go-units"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
 var listCommand = cli.Command{
-	Name:   "list",
-	Usage:  "list containers managed via boss",
-	Before: ReadyBefore,
+	Name:  "list",
+	Usage: "list containers managed via boss",
 	Action: func(clix *cli.Context) error {
-		var (
-			ctx    = cfg.Context()
-			client = cfg.Client()
-		)
+		ctx := system.Context()
+		client, err := system.NewClient()
+		if err != nil {
+			return err
+		}
+		defer client.Close()
 		containers, err := client.Containers(ctx)
 		if err != nil {
 			return err

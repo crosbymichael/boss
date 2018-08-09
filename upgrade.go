@@ -7,15 +7,15 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/platforms"
 	"github.com/crosbymichael/boss/flux"
+	"github.com/crosbymichael/boss/system"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"golang.org/x/sys/unix"
 )
 
 var upgradeCommand = cli.Command{
-	Name:   "upgrade",
-	Usage:  "upgrade a container's image but keep its data, like it should be",
-	Before: ReadyBefore,
+	Name:  "upgrade",
+	Usage: "upgrade a container's image but keep its data, like it should be",
 	Flags: []cli.Flag{
 		cli.StringSliceFlag{
 			Name:  "platform",
@@ -31,10 +31,13 @@ var upgradeCommand = cli.Command{
 		var (
 			id  = clix.Args().First()
 			ref = clix.Args().Get(1)
-
-			ctx    = cfg.Context()
-			client = cfg.Client()
+			ctx = system.Context()
 		)
+		client, err := system.NewClient()
+		if err != nil {
+			return err
+		}
+		defer client.Close()
 		ctx, done, err := client.WithLease(ctx)
 		if err != nil {
 			return err
@@ -62,6 +65,14 @@ var upgradeCommand = cli.Command{
 }
 
 func pauseAndRun(ctx context.Context, id string, client *containerd.Client, fn func() error) error {
+	c, err := system.Load()
+	if err != nil {
+		return err
+	}
+	register, err := system.GetRegister(c)
+	if err != nil {
+		return err
+	}
 	container, err := client.LoadContainer(ctx, id)
 	if err != nil {
 		return err
@@ -70,11 +81,11 @@ func pauseAndRun(ctx context.Context, id string, client *containerd.Client, fn f
 	if err != nil {
 		return err
 	}
-	if err := cfg.GetRegister().EnableMaintainance(id, "upgrade image"); err != nil {
+	if err := register.EnableMaintainance(id, "upgrade image"); err != nil {
 		return err
 	}
 	defer func() {
-		if err := cfg.GetRegister().DisableMaintainance(id); err != nil {
+		if err := register.DisableMaintainance(id); err != nil {
 			logrus.WithError(err).Error("disable maintaince")
 		}
 	}()

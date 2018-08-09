@@ -4,13 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/crosbymichael/boss/config"
-	"github.com/crosbymichael/boss/system"
-	"github.com/crosbymichael/boss/systemd"
 	"github.com/urfave/cli"
 )
-
-var cfg *system.Config
 
 func main() {
 	app := cli.NewApp()
@@ -45,32 +40,8 @@ run containers like a boss`
 		systemdCommand,
 		upgradeCommand,
 	}
-	app.Before = func(clix *cli.Context) error {
-		c, err := system.Load("/etc/boss/boss.toml")
-		if err != nil {
-			return err
-		}
-		cfg = c
-		if os.Geteuid() != 0 {
-			return nil
-		}
-		if err := os.MkdirAll(config.Root, 0711); err != nil {
-			return err
-		}
-		return systemd.Install()
-	}
-	app.After = func(clix *cli.Context) error {
-		if cfg == nil {
-			return nil
-		}
-		return cfg.Close()
-	}
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-}
-
-func ReadyBefore(clix *cli.Context) error {
-	return system.Ready(cfg)
 }

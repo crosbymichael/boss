@@ -2,8 +2,6 @@ package system
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"net"
 	"os"
 
@@ -14,12 +12,7 @@ import (
 	gocni "github.com/containerd/go-cni"
 	"github.com/crosbymichael/boss/config"
 	"github.com/hashicorp/consul/api"
-	"github.com/sirupsen/logrus"
-)
-
-const (
-	DefaultRuntime   = "io.containerd.runc.v1"
-	DefaultNamespace = "boss"
+	"github.com/pkg/errors"
 )
 
 // Register is an object that registers and manages service information in its backend
@@ -35,16 +28,12 @@ type Network interface {
 	Remove(containerd.Container) error
 }
 
-func Load(path string) (*Config, error) {
-	var c Config
-	if _, err := toml.DecodeFile(path, &c); err != nil {
+// Load the system config from disk
+// fix up any missing fields with runtime data
+func Load() (*config.Config, error) {
+	var c config.Config
+	if _, err := toml.DecodeFile(config.Path, &c); err != nil {
 		return nil, err
-	}
-	if c.Namespace == "" {
-		c.Namespace = DefaultNamespace
-	}
-	if c.Runtime == "" {
-		c.Runtime = DefaultRuntime
 	}
 	if c.ID == "" {
 		id, err := os.Hostname()
@@ -53,155 +42,89 @@ func Load(path string) (*Config, error) {
 		}
 		c.ID = id
 	}
-	c.context = namespaces.WithNamespace(context.Background(), c.Namespace)
-	if len(c.Nameservers) == 0 {
-		c.Nameservers = []string{
-			"8.8.8.8",
-			"8.8.4.4",
-		}
-	}
-	if os.Geteuid() == 0 {
-		client, err := containerd.New(
-			defaults.DefaultAddress,
-			containerd.WithDefaultRuntime(c.Runtime),
-		)
-		if err != nil {
-			logrus.WithError(err).Error("connect to containerd")
-		}
-		c.client = client
-	}
 	if c.Iface == "" {
 		c.Iface = "eth0"
 	}
 	return &c, nil
 }
 
-func Ready(c *Config) error {
+// Context returns a new context to be used by boss
+func Context() context.Context {
+	return namespaces.WithNamespace(context.Background(), config.DefaultNamespace)
+}
+
+// NewClient returns a new containerd client
+func NewClient() (*containerd.Client, error) {
+	return containerd.New(
+		defaults.DefaultAddress,
+		containerd.WithDefaultRuntime(config.DefaultRuntime),
+	)
+}
+
+// GetNetwork returns a network for the givin name
+func GetNetwork(c *config.Config, name string) (Network, error) {
 	ip, err := GetIP(c.Iface)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	c.networks = make(map[string]Network)
-	c.networks["host"] = &host{ip: ip}
-	c.networks["none"] = &none{}
-	c.networks[""] = &none{}
-	if c.CNI != nil {
+	switch name {
+	case "", "none":
+		return &none{}, nil
+	case "host":
+		return &host{ip: ip}, nil
+	case "cni":
+		if c.CNI == nil {
+			return nil, errors.New("[cni] is not enabled in the system config")
+		}
 		n, err := gocni.New(gocni.WithPluginDir([]string{"/opt/containerd/bin"}), gocni.WithConf(c.CNI.Bytes()))
 		if err != nil {
-			return err
+			return nil, err
 		}
-		c.networks["cni"] = &cni{
-			network: n,
-		}
+		return &cni{network: n}, nil
 	}
+	return nil, errors.Errorf("network %s does not exist", name)
+}
+
+func GetRegister(c *config.Config) (Register, error) {
 	if c.Consul != nil {
 		consul, err := api.NewClient(api.DefaultConfig())
 		if err != nil {
-			return err
+			return nil, err
 		}
-		c.consul = consul
+		return &Consul{
+			client: consul,
+		}, nil
+	}
+	return &nullRegister{}, nil
+}
+
+func GetNameservers(c *config.Config) ([]string, error) {
+	if c.Consul != nil {
+		consul, err := api.NewClient(api.DefaultConfig())
+		if err != nil {
+			return nil, err
+		}
 		nodes, _, err := consul.Catalog().Nodes(&api.QueryOptions{})
 		if err != nil {
-			return err
+			return nil, err
 		}
-		c.Nameservers = nil
+		var ns []string
 		for _, n := range nodes {
-			c.Nameservers = append(c.Nameservers, n.Address)
+			ns = append(ns, n.Address)
 		}
+		return ns, nil
 	}
+	if len(c.Nameservers) == 0 {
+		return []string{
+			"8.8.8.8",
+			"8.8.4.4",
+		}, nil
+	}
+	return c.Nameservers, nil
+}
+
+func Ready(c *config.Config) error {
 	return nil
-}
-
-type Config struct {
-	ID          string        `toml:"id"`
-	Iface       string        `toml:"iface"`
-	Domain      string        `toml:"domain"`
-	Namespace   string        `toml:"namespace"`
-	Debug       bool          `toml:"debug"`
-	Runtime     string        `toml:"runtime"`
-	Buildkit    *Buildkit     `toml:"buildkit"`
-	CNI         *CNI          `toml:"cni"`
-	Consul      *ConsulConfig `toml:"consul"`
-	NodeMetrics *NodeMetrics  `toml:"nodemetrics"`
-	Nameservers []string      `toml:"nameservers"`
-	//SSH         SSH          `toml:"ssh"`
-
-	networks map[string]Network
-	context  context.Context
-	client   *containerd.Client
-	consul   *api.Client
-	ip       string
-}
-
-func (c *Config) Close() error {
-	if c.client != nil {
-		return c.client.Close()
-	}
-	return nil
-}
-
-func (c *Config) Context() context.Context {
-	return c.context
-}
-
-func (c *Config) Client() *containerd.Client {
-	return c.client
-}
-
-func (c *Config) GetConsul() *api.Client {
-	return c.consul
-}
-
-func (c *Config) GetRegister() Register {
-	if c.consul == nil {
-		return &nullRegister{}
-	}
-	return &Consul{
-		client: c.consul,
-	}
-}
-
-func (c *Config) Network(id string) Network {
-	return c.networks[id]
-}
-
-type ConsulConfig struct {
-	Image     string `toml:"image"`
-	Bootstrap bool   `toml:"bootstrap"`
-}
-
-type SSH struct {
-	Admin          string `toml:"admin"`
-	AuthorizedKeys string `toml:"authorized_keys"`
-}
-
-type Buildkit struct {
-	Image string `toml:"image"`
-}
-
-type CNI struct {
-	Version string `toml:"version" json:"cniVersion,omitempty"`
-	Image   string `toml:"image" json:"-"`
-	Name    string `toml:"name" json:"name"`
-	Type    string `toml:"type" json:"type"`
-	Master  string `toml:"master" json:"master,omitempty"`
-	IPAM    IPAM   `toml:"ipam" json:"ipam"`
-}
-
-func (c *CNI) Bytes() []byte {
-	data, err := json.Marshal(c)
-	if err != nil {
-		panic(err)
-	}
-	return data
-}
-
-type IPAM struct {
-	Type string `toml:"type" json:"type"`
-}
-
-type NodeMetrics struct {
-	Image string `toml:"image"`
 }
 
 var ErrIPAddressNotFound = errors.New("box: ip address for interface not found")

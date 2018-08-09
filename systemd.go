@@ -44,7 +44,11 @@ var systemdExecStartPreCommand = cli.Command{
 	Usage: "exec-start-pre proxy for containers",
 	Action: func(clix *cli.Context) error {
 		id := clix.Args().First()
-		if err := setupResolvConf(); err != nil {
+		c, err := system.Load()
+		if err != nil {
+			return err
+		}
+		if err := setupResolvConf(c); err != nil {
 			return err
 		}
 		if err := setupApparmor(); err != nil {
@@ -60,7 +64,15 @@ var systemdExecStartPostCommand = cli.Command{
 	Action: func(clix *cli.Context) error {
 		id := clix.Args().First()
 		err := cleanupPreviousTask(id)
-		cfg.GetRegister().EnableMaintainance(id, "task exited")
+		c, err := system.Load()
+		if err != nil {
+			return err
+		}
+		register, err := system.GetRegister(c)
+		if err != nil {
+			return err
+		}
+		register.EnableMaintainance(id, "task exited")
 		return err
 	},
 }
@@ -72,10 +84,14 @@ var systemdExecStartCommand = cli.Command{
 		id := clix.Args().First()
 		var (
 			signals = make(chan os.Signal, 64)
-			ctx     = cfg.Context()
-			client  = cfg.Client()
+			ctx     = system.Context()
 		)
 		signal.Notify(signals)
+		client, err := system.NewClient()
+		if err != nil {
+			return err
+		}
+		defer client.Close()
 		container, err := client.LoadContainer(ctx, id)
 		if err != nil {
 			return err
@@ -103,6 +119,11 @@ var systemdExecStartCommand = cli.Command{
 
 func monitorTask(ctx context.Context, client *containerd.Client, task containerd.Task, signals chan os.Signal) (int, error) {
 	defer task.Delete(ctx, containerd.WithProcessKill)
+	c, err := system.Load()
+	register, err := system.GetRegister(c)
+	if err != nil {
+		return -1, err
+	}
 	started := make(chan error, 1)
 	wait, err := task.Wait(ctx)
 	if err != nil {
@@ -117,7 +138,7 @@ func monitorTask(ctx context.Context, client *containerd.Client, task containerd
 			if err != nil {
 				return -1, err
 			}
-			if err := cfg.GetRegister().DisableMaintainance(task.ID()); err != nil {
+			if err := register.DisableMaintainance(task.ID()); err != nil {
 				logrus.WithError(err).Error("disable service maintenance")
 			}
 		case s := <-signals:
@@ -173,14 +194,26 @@ func isUnavailable(err error) bool {
 }
 
 func setupNetworking(ctx context.Context, task containerd.Task, c *config.Container) error {
-	ip, err := cfg.Network(c.Network).Create(task)
+	cfg, err := system.Load()
+	if err != nil {
+		return err
+	}
+	network, err := system.GetNetwork(cfg, c.Network)
+	if err != nil {
+		return err
+	}
+	register, err := system.GetRegister(cfg)
+	if err != nil {
+		return err
+	}
+	ip, err := network.Create(task)
 	if err != nil {
 		return err
 	}
 	if ip != "" {
 		logrus.WithField("id", task.ID()).WithField("ip", ip).Debug("setup network interface")
 		for name, srv := range c.Services {
-			if err := cfg.GetRegister().Register(task.ID(), name, ip, srv); err != nil {
+			if err := register.Register(task.ID(), name, ip, srv); err != nil {
 				logrus.WithError(err).Error("register service")
 			}
 		}
@@ -193,16 +226,20 @@ func systemdPreSetup(clix *cli.Context) error {
 	if id == "" {
 		return errIDRequired
 	}
-	return system.Ready(cfg)
+	return nil
 }
 
-func setupResolvConf() error {
+func setupResolvConf(c *config.Config) error {
+	servers, err := system.GetNameservers(c)
+	if err != nil {
+		return err
+	}
 	f, err := os.Create(filepath.Join(config.Root, "resolv.conf"))
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	for _, ns := range cfg.Nameservers {
+	for _, ns := range servers {
 		if _, err := f.WriteString(fmt.Sprintf("nameserver %s\n", ns)); err != nil {
 			return err
 		}
@@ -217,8 +254,13 @@ func setupApparmor() error {
 }
 
 func cleanupPreviousTask(id string) error {
-	ctx := cfg.Context()
-	container, err := cfg.Client().LoadContainer(ctx, id)
+	ctx := system.Context()
+	client, err := system.NewClient()
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+	container, err := client.LoadContainer(ctx, id)
 	if err != nil {
 		return err
 	}

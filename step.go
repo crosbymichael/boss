@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/system"
 	"github.com/crosbymichael/boss/systemd"
 	"github.com/hashicorp/consul/api"
@@ -31,6 +32,7 @@ Restart=always
 WantedBy=multi-user.target`
 
 type consulStep struct {
+	config *config.Config
 }
 
 func (s *consulStep) name() string {
@@ -38,14 +40,14 @@ func (s *consulStep) name() string {
 }
 
 func (s *consulStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
-	if err := install(ctx, client, cfg.Consul.Image, clix); err != nil {
+	if err := install(ctx, client, s.config.Consul.Image, clix); err != nil {
 		return err
 	}
 	const name = "consul.service"
 	if err := os.MkdirAll("/var/lib/consul", 0711); err != nil {
 		return err
 	}
-	ip, err := system.GetIP(cfg.Iface)
+	ip, err := system.GetIP(s.config.Iface)
 	if err != nil {
 		return err
 	}
@@ -55,11 +57,11 @@ func (s *consulStep) run(ctx context.Context, client *containerd.Client, clix *c
 		ID        string
 		IP        string
 	}{
-		ID:     cfg.ID,
-		Domain: cfg.Domain,
+		ID:     s.config.ID,
+		Domain: s.config.Domain,
 		IP:     ip,
 	}
-	if cfg.Consul.Bootstrap {
+	if s.config.Consul.Bootstrap {
 		tmplCtx.Bootstrap = "-bootstrap"
 	}
 	t, err := template.New("consul").Parse(consulUnit)
@@ -107,6 +109,7 @@ Restart=always
 WantedBy=multi-user.target`
 
 type nodeMetricsStep struct {
+	config *config.Config
 }
 
 func (s *nodeMetricsStep) name() string {
@@ -115,7 +118,7 @@ func (s *nodeMetricsStep) name() string {
 
 func (s *nodeMetricsStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
 	const name = "nodeexporter.service"
-	if err := install(ctx, client, cfg.NodeMetrics.Image, clix); err != nil {
+	if err := install(ctx, client, s.config.NodeMetrics.Image, clix); err != nil {
 		return err
 	}
 	if err := writeUnit(name, metricsUnit); err != nil {
@@ -137,6 +140,7 @@ Restart=always
 WantedBy=multi-user.target`
 
 type buildkitStep struct {
+	config *config.Config
 }
 
 func (s *buildkitStep) name() string {
@@ -145,7 +149,7 @@ func (s *buildkitStep) name() string {
 
 func (s *buildkitStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
 	const name = "buildkit.service"
-	if err := install(ctx, client, cfg.Buildkit.Image, clix); err != nil {
+	if err := install(ctx, client, s.config.Buildkit.Image, clix); err != nil {
 		return err
 	}
 	if err := writeUnit(name, buildkitUnit); err != nil {
@@ -155,6 +159,7 @@ func (s *buildkitStep) run(ctx context.Context, client *containerd.Client, clix 
 }
 
 type cniStep struct {
+	config *config.Config
 }
 
 func (s *cniStep) name() string {
@@ -162,7 +167,7 @@ func (s *cniStep) name() string {
 }
 
 func (s *cniStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
-	return install(ctx, client, cfg.CNI.Image, clix)
+	return install(ctx, client, s.config.CNI.Image, clix)
 }
 
 const dhcpUnit = `[Unit]
@@ -203,9 +208,10 @@ func (s *networkWaitStep) run(ctx context.Context, client *containerd.Client, cl
 }
 
 type registerStep struct {
-	id   string
-	port int
-	tags []string
+	id     string
+	port   int
+	tags   []string
+	config *config.Config
 }
 
 func (s *registerStep) name() string {
@@ -213,7 +219,7 @@ func (s *registerStep) name() string {
 }
 
 func (s *registerStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
-	ip, err := system.GetIP(cfg.Iface)
+	ip, err := system.GetIP(s.config.Iface)
 	if err != nil {
 		return err
 	}

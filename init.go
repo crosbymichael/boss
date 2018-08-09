@@ -14,12 +14,14 @@ import (
 	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/content/local"
-	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/pkg/progress"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
+	"github.com/crosbymichael/boss/config"
+	"github.com/crosbymichael/boss/system"
+	"github.com/crosbymichael/boss/systemd"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
@@ -44,18 +46,34 @@ var initCommand = cli.Command{
 			steps     []step
 			start     = time.Now()
 		)
-		if cfg.Consul != nil {
+		c, err := system.Load()
+		if err != nil {
+			return err
+		}
+		client, err := system.NewClient()
+		if err != nil {
+			return err
+		}
+		defer client.Close()
+		if err := os.MkdirAll(config.Root, 0711); err != nil {
+			return err
+		}
+		if err := systemd.Install(); err != nil {
+			return err
+		}
+		if c.Consul != nil {
 			hasConsul = true
-			steps = append(steps, &consulStep{})
+			steps = append(steps, &consulStep{config: c})
 			if ips := clix.StringSlice("join"); len(ips) > 0 {
 				steps = append(steps, &joinStep{ips: ips})
 			}
 		}
-		if cfg.NodeMetrics != nil {
-			steps = append(steps, &nodeMetricsStep{})
+		if c.NodeMetrics != nil {
+			steps = append(steps, &nodeMetricsStep{config: c})
 			if hasConsul {
 				steps = append(steps, &registerStep{
-					id: "node-exporter",
+					config: c,
+					id:     "node-exporter",
 					tags: []string{
 						"metrics",
 					},
@@ -63,24 +81,26 @@ var initCommand = cli.Command{
 				})
 			}
 		}
-		if cfg.Buildkit != nil {
-			steps = append(steps, &buildkitStep{})
+		if c.Buildkit != nil {
+			steps = append(steps, &buildkitStep{config: c})
 			if hasConsul {
 				steps = append(steps, &registerStep{
-					id:   "buildkit",
-					port: 9000,
+					config: c,
+					id:     "buildkit",
+					port:   9000,
 				})
 			}
 		}
-		if cfg.CNI != nil {
-			steps = append(steps, &cniStep{})
-			if cfg.CNI.IPAM.Type == "dhcp" {
+		if c.CNI != nil {
+			steps = append(steps, &cniStep{config: c})
+			if c.CNI.IPAM.Type == "dhcp" {
 				steps = append(steps, &dhcpStep{})
 			}
 		}
 		if hasConsul {
 			steps = append(steps, &registerStep{
-				id: "containerd",
+				config: c,
+				id:     "containerd",
 				tags: []string{
 					"metrics",
 				},
@@ -90,9 +110,10 @@ var initCommand = cli.Command{
 		var (
 			fw    = progress.NewWriter(os.Stderr)
 			total = float64(len(steps))
+			ctx   = system.Context()
 		)
 		for i, s := range steps {
-			if err := s.run(cfg.Context(), cfg.Client(), clix); err != nil {
+			if err := s.run(ctx, client, clix); err != nil {
 				return errors.Wrapf(err, "install %s", s.name())
 			}
 			bar := progress.Bar(float64(i+1) / total)
@@ -144,7 +165,7 @@ var containerdCommand = cli.Command{
 			return err
 		}
 		defer os.RemoveAll(dir)
-		ctx := cfg.Context()
+		ctx := system.Context()
 		cs, err := local.NewStore(dir)
 		if err != nil {
 			return err
@@ -195,10 +216,7 @@ var containerdCommand = cli.Command{
 		if err := startNewService(ctx, name); err != nil {
 			return err
 		}
-		client, err := containerd.New(
-			defaults.DefaultAddress,
-			containerd.WithDefaultRuntime(cfg.Runtime),
-		)
+		client, err := system.NewClient()
 		if err != nil {
 			return err
 		}

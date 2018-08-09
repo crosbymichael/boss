@@ -2,20 +2,24 @@ package main
 
 import (
 	"github.com/crosbymichael/boss/flux"
+	"github.com/crosbymichael/boss/system"
 	"github.com/urfave/cli"
 	"golang.org/x/sys/unix"
 )
 
 var rollbackCommand = cli.Command{
-	Name:   "rollback",
-	Usage:  "rollback a container to a previous revision",
-	Before: ReadyBefore,
+	Name:  "rollback",
+	Usage: "rollback a container to a previous revision",
 	Action: func(clix *cli.Context) error {
 		var (
-			id     = clix.Args().First()
-			ctx    = cfg.Context()
-			client = cfg.Client()
+			id  = clix.Args().First()
+			ctx = system.Context()
 		)
+		client, err := system.NewClient()
+		if err != nil {
+			return err
+		}
+		defer client.Close()
 		ctx, done, err := client.WithLease(ctx)
 		if err != nil {
 			return err

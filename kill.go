@@ -1,23 +1,36 @@
 package main
 
 import (
+	"github.com/crosbymichael/boss/system"
 	"github.com/urfave/cli"
 	"golang.org/x/sys/unix"
 )
 
 var killCommand = cli.Command{
-	Name:   "kill",
-	Usage:  "kill a running service",
-	Before: ReadyBefore,
+	Name:  "kill",
+	Usage: "kill a running service",
 	Action: func(clix *cli.Context) error {
 		var (
 			id  = clix.Args().First()
-			ctx = cfg.Context()
+			ctx = system.Context()
 		)
-		if err := cfg.GetRegister().EnableMaintainance(id, "manual kill"); err != nil {
+		c, err := system.Load()
+		if err != nil {
 			return err
 		}
-		container, err := cfg.Client().LoadContainer(ctx, id)
+		client, err := system.NewClient()
+		if err != nil {
+			return err
+		}
+		client.Close()
+		register, err := system.GetRegister(c)
+		if err != nil {
+			return err
+		}
+		if err := register.EnableMaintainance(id, "manual kill"); err != nil {
+			return err
+		}
+		container, err := client.LoadContainer(ctx, id)
 		if err != nil {
 			return err
 		}
