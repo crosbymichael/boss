@@ -19,13 +19,14 @@ import (
 type step interface {
 	name() string
 	run(context.Context, *containerd.Client, *cli.Context) error
+	remove(context.Context, *containerd.Client, *cli.Context) error
 }
 
 const consulUnit = `[Unit]
 Description=consul.io
 
 [Service]
-ExecStart=/opt/containerd/bin/consul agent {{.Bootstrap}} -server -data-dir=/var/lib/consul -datacenter {{.Domain}} -node {{.ID}} -ui -client "127.0.0.1 {{.IP}}" -domain {{.Domain}} -recursor 8.8.8.8 -recursor 8.8.4.4 -dns-port 53
+ExecStart=/opt/containerd/bin/consul agent {{.Bootstrap}} -server -data-dir=/var/lib/consul -datacenter {{.Domain}} -node {{.ID}} -ui -bind {{.IP}} -client "127.0.0.1 {{.IP}}" -domain {{.Domain}} -recursor 8.8.8.8 -recursor 8.8.4.4 -dns-port 53
 Restart=always
 
 [Install]
@@ -36,7 +37,7 @@ type consulStep struct {
 }
 
 func (s *consulStep) name() string {
-	return "install consul"
+	return "consul"
 }
 
 func (s *consulStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
@@ -77,6 +78,17 @@ func (s *consulStep) run(ctx context.Context, client *containerd.Client, clix *c
 	return startNewService(ctx, name)
 }
 
+func (s *consulStep) remove(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
+	if err := client.ImageService().Delete(ctx, s.config.Consul.Image); err != nil {
+		return err
+	}
+	const name = "consul.service"
+	if err := disableService(ctx, name); err != nil {
+		return err
+	}
+	return os.RemoveAll("/var/lib/consul")
+}
+
 type joinStep struct {
 	ips []string
 }
@@ -98,6 +110,10 @@ func (s *joinStep) run(ctx context.Context, client *containerd.Client, clix *cli
 	return nil
 }
 
+func (s *joinStep) remove(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
+	return nil
+}
+
 const metricsUnit = `[Unit]
 Description=prometheus node metrics
 
@@ -113,7 +129,7 @@ type nodeMetricsStep struct {
 }
 
 func (s *nodeMetricsStep) name() string {
-	return "install node exporter"
+	return "node exporter"
 }
 
 func (s *nodeMetricsStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
@@ -125,6 +141,14 @@ func (s *nodeMetricsStep) run(ctx context.Context, client *containerd.Client, cl
 		return err
 	}
 	return startNewService(ctx, name)
+}
+
+func (s *nodeMetricsStep) remove(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
+	if err := client.ImageService().Delete(ctx, s.config.NodeMetrics.Image); err != nil {
+		return err
+	}
+	const name = "nodeexporter.service"
+	return disableService(ctx, name)
 }
 
 const buildkitUnit = `[Unit]
@@ -144,7 +168,7 @@ type buildkitStep struct {
 }
 
 func (s *buildkitStep) name() string {
-	return "install buildkit"
+	return "buildkit"
 }
 
 func (s *buildkitStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
@@ -158,16 +182,31 @@ func (s *buildkitStep) run(ctx context.Context, client *containerd.Client, clix 
 	return startNewService(ctx, name)
 }
 
+func (s *buildkitStep) remove(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
+	if err := client.ImageService().Delete(ctx, s.config.Buildkit.Image); err != nil {
+		return err
+	}
+	const name = "buildkit.service"
+	return disableService(ctx, name)
+}
+
 type cniStep struct {
 	config *config.Config
 }
 
 func (s *cniStep) name() string {
-	return "install cni"
+	return "cni"
 }
 
 func (s *cniStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
 	return install(ctx, client, s.config.CNI.Image, clix)
+}
+
+func (s *cniStep) remove(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
+	if err := client.ImageService().Delete(ctx, s.config.CNI.Image); err != nil {
+		return err
+	}
+	return nil
 }
 
 const dhcpUnit = `[Unit]
@@ -185,7 +224,7 @@ type dhcpStep struct {
 }
 
 func (s *dhcpStep) name() string {
-	return "install dhcp"
+	return "dhcp"
 }
 
 func (s *dhcpStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
@@ -196,15 +235,39 @@ func (s *dhcpStep) run(ctx context.Context, client *containerd.Client, clix *cli
 	return startNewService(ctx, name)
 }
 
-type networkWaitStep struct {
+func (s *dhcpStep) remove(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
+	const name = "cni-dhcp.service"
+	return disableService(ctx, name)
 }
 
-func (s *networkWaitStep) name() string {
-	return "network wait on boot"
+type mkdirRoot struct {
 }
 
-func (s *networkWaitStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
-	return systemd.Enable(ctx, "systemd-networkd-wait-online.service")
+func (s *mkdirRoot) name() string {
+	return "mkdir /var/lib/boss"
+}
+
+func (s *mkdirRoot) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
+	return os.MkdirAll(config.Root, 0711)
+}
+
+func (s *mkdirRoot) remove(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
+	return os.RemoveAll(config.Root)
+}
+
+type bossUnit struct {
+}
+
+func (s *bossUnit) name() string {
+	return "boss unit"
+}
+
+func (s *bossUnit) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
+	return systemd.Install()
+}
+
+func (s *bossUnit) remove(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
+	return systemd.Remove()
 }
 
 type registerStep struct {
@@ -237,6 +300,15 @@ func (s *registerStep) run(ctx context.Context, client *containerd.Client, clix 
 	return consul.Agent().ServiceRegister(reg)
 }
 
+func (s *registerStep) remove(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
+	consul, err := api.NewClient(api.DefaultConfig())
+	if err != nil {
+		return nil
+	}
+	consul.Agent().ServiceDeregister(s.id)
+	return nil
+}
+
 func install(ctx context.Context, client *containerd.Client, ref string, clix *cli.Context) error {
 	image, err := getImage(ctx, client, ref, clix, nil, false)
 	if err != nil {
@@ -256,6 +328,9 @@ func writeUnit(name, data string) error {
 }
 
 func startNewService(ctx context.Context, name string) error {
+	if err := systemd.Command(ctx, "daemon-reload"); err != nil {
+		return err
+	}
 	if err := systemd.Command(ctx, "enable", name); err != nil {
 		return err
 	}
@@ -274,4 +349,14 @@ func startNewService(ctx context.Context, name string) error {
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
+}
+
+func disableService(ctx context.Context, name string) error {
+	if err := systemd.Command(ctx, "stop", name); err != nil {
+		return err
+	}
+	if err := systemd.Command(ctx, "disable", name); err != nil {
+		return err
+	}
+	return os.Remove(filepath.Join("/lib/systemd/system", name))
 }

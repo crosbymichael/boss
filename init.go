@@ -1,27 +1,13 @@
 package main
 
 import (
-	"archive/tar"
-	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
-	"path/filepath"
+	"sync"
 	"time"
 
-	"github.com/containerd/containerd/archive"
-	"github.com/containerd/containerd/archive/compression"
-	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/content/local"
-	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/pkg/progress"
-	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/containerd/remotes"
-	"github.com/containerd/containerd/remotes/docker"
-	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/system"
-	"github.com/crosbymichael/boss/systemd"
-	"github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
@@ -34,6 +20,10 @@ var initCommand = cli.Command{
 			Name:  "join",
 			Usage: "list of consul servers to join",
 			Value: &cli.StringSlice{},
+		},
+		cli.BoolFlag{
+			Name:  "undo",
+			Usage: "remove all boss init steps from the system, goodbye",
 		},
 	},
 	Subcommands: []cli.Command{
@@ -54,12 +44,7 @@ var initCommand = cli.Command{
 			return err
 		}
 		defer client.Close()
-		if err := os.MkdirAll(config.Root, 0711); err != nil {
-			return err
-		}
-		if err := systemd.Install(); err != nil {
-			return err
-		}
+		steps = append(steps, &mkdirRoot{}, &bossUnit{})
 		if c.Consul != nil {
 			hasConsul = true
 			steps = append(steps, &consulStep{config: c})
@@ -107,133 +92,67 @@ var initCommand = cli.Command{
 			})
 		}
 		var (
-			fw    = progress.NewWriter(os.Stderr)
-			total = float64(len(steps))
-			ctx   = system.Context()
-		)
-		for i, s := range steps {
-			if err := s.run(ctx, client, clix); err != nil {
-				return errors.Wrapf(err, "install %s", s.name())
+			cmu          sync.Mutex
+			pwg          sync.WaitGroup
+			fw           = progress.NewWriter(os.Stderr)
+			total        = float64(len(steps))
+			ctx          = system.Context()
+			stepProgress = make(chan output, 10)
+			current      = output{
+				i:    0,
+				name: "init",
 			}
-			bar := progress.Bar(float64(i+1) / total)
-			fmt.Fprintf(fw, "%s:\t%d/%d\t%40r\t\n", s.name(), i+1, int(total), bar)
+		)
+		pwg.Add(1)
+		go func() {
+			defer pwg.Done()
+			for s := range stepProgress {
+				bar := progress.Bar(float64(s.i+1) / total)
+				fmt.Fprintf(fw, "%s:\t%d/%d\t%40r\t\n", s.name, s.i+1, int(total), bar)
 
-			fmt.Fprintf(fw, "elapsed: %-4.1fs\t\n",
-				time.Since(start).Seconds(),
-			)
-			fw.Flush()
+				fmt.Fprintf(fw, "elapsed: %-4.1fs\t\n",
+					time.Since(start).Seconds(),
+				)
+				fw.Flush()
+			}
+		}()
+		ticker := time.NewTicker(100 * time.Millisecond)
+		go func() {
+			for range ticker.C {
+				cmu.Lock()
+				stepProgress <- current
+				cmu.Unlock()
+			}
+		}()
+		for i, s := range steps {
+			cmu.Lock()
+			current = output{
+				name: s.name(),
+				i:    i,
+			}
+			stepProgress <- current
+			cmu.Unlock()
+			fn := s.run
+			if clix.Bool("undo") {
+				fn = s.remove
+			}
+			if err := fn(ctx, client, clix); err != nil {
+				return errors.Wrapf(err, "execute %s", s.name())
+			}
 		}
+		ticker.Stop()
+		close(stepProgress)
+		pwg.Wait()
+		if clix.Bool("undo") {
+			fmt.Println("boss removed and out of your way")
+			return nil
+		}
+		fmt.Println("boss intitalized and ready for use, have fun!")
 		return nil
 	},
 }
 
-const containerdUnit = `[Unit]
-Description=containerd container runtime
-Documentation=https://containerd.io
-After=network.target
-
-[Service]
-ExecStartPre=/sbin/modprobe overlay
-ExecStart=/usr/local/bin/containerd
-Delegate=yes
-KillMode=process
-LimitNOFILE=1048576
-# Having non-zero Limit*s causes performance problems due to accounting overhead
-# in the kernel. We recommend using cgroups to do container-local accounting.
-LimitNPROC=infinity
-LimitCORE=infinity
-
-[Install]
-WantedBy=multi-user.target`
-
-const containerdConfig = `disabled_plugins = ["cri"]
-
-[metrics]
-        address = "0.0.0.0:9200"
-        grpc_histogram = true
-
-[plugins.cgroups]
-        no_prom = false`
-
-var containerdCommand = cli.Command{
-	Name:  "containerd",
-	Usage: "install containerd on a system",
-	Action: func(clix *cli.Context) error {
-		dir, err := ioutil.TempDir("", "containerd-install")
-		if err != nil {
-			return err
-		}
-		defer os.RemoveAll(dir)
-		ctx := system.Context()
-		cs, err := local.NewStore(dir)
-		if err != nil {
-			return err
-		}
-		desc, err := localFetch(ctx, cs)
-		if err != nil {
-			return err
-		}
-		platform := platforms.Default()
-		manifest, err := images.Manifest(ctx, cs, *desc, platform)
-		if err != nil {
-			return err
-		}
-		for _, layer := range manifest.Layers {
-			ra, err := cs.ReaderAt(ctx, layer)
-			if err != nil {
-				return err
-			}
-			cr := content.NewReader(ra)
-			r, err := compression.DecompressStream(cr)
-			if err != nil {
-				return err
-			}
-			defer r.Close()
-			if _, err := archive.Apply(ctx, "/usr/local", r, archive.WithFilter(func(hdr *tar.Header) (bool, error) {
-				d := filepath.Dir(hdr.Name)
-				return d == "bin", nil
-			})); err != nil {
-				return err
-			}
-		}
-		if err := os.MkdirAll("/etc/containerd", 0711); err != nil {
-			return err
-		}
-		f, err := os.Create(filepath.Join("/etc/containerd/config.toml"))
-		if err != nil {
-			return err
-		}
-		_, err = f.WriteString(containerdConfig)
-		f.Close()
-		if err != nil {
-			return err
-		}
-		const name = "containerd.service"
-		if err := writeUnit(name, containerdUnit); err != nil {
-			return err
-		}
-		return startNewService(ctx, name)
-	},
-}
-
-func localFetch(ctx context.Context, cs content.Store) (*v1.Descriptor, error) {
-	resolv := docker.NewResolver(docker.ResolverOptions{})
-	name, desc, err := resolv.Resolve(ctx, "docker.io/crosbymichael/containerd:latest")
-	if err != nil {
-		return nil, err
-	}
-	f, err := resolv.Fetcher(ctx, name)
-	if err != nil {
-		return nil, err
-	}
-	r, err := f.Fetch(ctx, desc)
-	if err != nil {
-		return nil, err
-	}
-	defer r.Close()
-	h := remotes.FetchHandler(cs, f)
-	if err := images.Dispatch(ctx, h, desc); err != nil {
-		return nil, err
-	}
-	return &desc, nil
+type output struct {
+	i    int
+	name string
 }

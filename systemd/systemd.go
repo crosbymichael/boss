@@ -31,6 +31,12 @@ func Install() error {
 	return nil
 }
 
+// Remove the boss unit file
+func Remove() error {
+	path := filepath.Join(Root, serviceName(""))
+	return os.Remove(path)
+}
+
 func Enable(ctx context.Context, id string) error {
 	return Command(ctx, "enable", serviceName(id))
 }
