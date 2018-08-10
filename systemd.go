@@ -100,12 +100,11 @@ var systemdExecStartCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStdio))
-		if err != nil {
+		if err := setupNetworking(ctx, container, config); err != nil {
 			return err
 		}
-		if err := setupNetworking(ctx, task, config); err != nil {
-			task.Delete(ctx, containerd.WithProcessKill)
+		task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStdio))
+		if err != nil {
 			return err
 		}
 		status, err := monitorTask(ctx, client, task, signals)
@@ -193,7 +192,7 @@ func isUnavailable(err error) bool {
 	return errdefs.IsUnavailable(errdefs.FromGRPC(err))
 }
 
-func setupNetworking(ctx context.Context, task containerd.Task, c *config.Container) error {
+func setupNetworking(ctx context.Context, container containerd.Container, c *config.Container) error {
 	cfg, err := system.Load()
 	if err != nil {
 		return err
@@ -206,14 +205,14 @@ func setupNetworking(ctx context.Context, task containerd.Task, c *config.Contai
 	if err != nil {
 		return err
 	}
-	ip, err := network.Create(task)
+	ip, err := network.Create(container)
 	if err != nil {
 		return err
 	}
 	if ip != "" {
-		logrus.WithField("id", task.ID()).WithField("ip", ip).Debug("setup network interface")
+		logrus.WithField("id", container.ID()).WithField("ip", ip).Debug("setup network interface")
 		for name, srv := range c.Services {
-			if err := register.Register(task.ID(), name, ip, srv); err != nil {
+			if err := register.Register(container.ID(), name, ip, srv); err != nil {
 				logrus.WithError(err).Error("register service")
 			}
 		}

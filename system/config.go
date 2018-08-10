@@ -24,7 +24,7 @@ type Register interface {
 }
 
 type Network interface {
-	Create(containerd.Task) (string, error)
+	Create(containerd.Container) (string, error)
 	Remove(containerd.Container) error
 }
 

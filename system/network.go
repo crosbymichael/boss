@@ -19,10 +19,13 @@ type cni struct {
 	network networking.CNI
 }
 
-func (n *cni) Create(task containerd.Task) (string, error) {
+func (n *cni) Create(task containerd.Container) (string, error) {
 	path := filepath.Join(config.Net, task.ID())
-	if _, err := os.Lstat(path); err != nil {
+	if _, err := os.Lstat(filepath.Join(path, "ip")); err != nil {
 		if !os.IsNotExist(err) {
+			return "", err
+		}
+		if err := os.MkdirAll(path, 0700); err != nil {
 			return "", err
 		}
 		nspath := filepath.Join(path, "ns")
@@ -66,7 +69,7 @@ type host struct {
 	ip string
 }
 
-func (n *host) Create(_ containerd.Task) (string, error) {
+func (n *host) Create(_ containerd.Container) (string, error) {
 	return n.ip, nil
 }
 
@@ -77,7 +80,7 @@ func (n *host) Remove(_ containerd.Container) error {
 type none struct {
 }
 
-func (n *none) Create(_ containerd.Task) (string, error) {
+func (n *none) Create(_ containerd.Container) (string, error) {
 	return "", nil
 }
 
