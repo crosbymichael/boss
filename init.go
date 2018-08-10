@@ -26,9 +26,6 @@ var initCommand = cli.Command{
 			Usage: "remove all boss init steps from the system, goodbye",
 		},
 	},
-	Subcommands: []cli.Command{
-		containerdCommand,
-	},
 	Action: func(clix *cli.Context) error {
 		var (
 			hasConsul bool
@@ -41,7 +38,7 @@ var initCommand = cli.Command{
 		}
 		client, err := system.NewClient()
 		if err != nil {
-			return err
+			return errors.Wrap(err, "unable to connect to containerd, it's the one thing you have to do...for now")
 		}
 		defer client.Close()
 		steps = append(steps, &mkdirRoot{}, &bossUnit{})
