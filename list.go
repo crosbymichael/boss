@@ -10,6 +10,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/typeurl"
+	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/system"
 	units "github.com/docker/go-units"
 	"github.com/sirupsen/logrus"
@@ -31,8 +32,8 @@ var listCommand = cli.Command{
 			return err
 		}
 		w := tabwriter.NewWriter(os.Stdout, 10, 1, 3, ' ', 0)
-		const tfmt = "%s\t%s\t%s\t%s\t%s\t%s\t%s\n"
-		fmt.Fprint(w, "ID\tIMAGE\tSTATUS\tCPU\tMEMORY\tPIDS\tSIZE\n")
+		const tfmt = "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n"
+		fmt.Fprint(w, "ID\tIMAGE\tSTATUS\tIP\tCPU\tMEMORY\tPIDS\tSIZE\n")
 		for _, c := range containers {
 			info, err := c.Info(ctx)
 			if err != nil {
@@ -41,7 +42,7 @@ var listCommand = cli.Command{
 			task, err := c.Task(ctx, nil)
 			if err != nil {
 				if errdefs.IsNotFound(err) {
-					fmt.Fprintf(w, tfmt, c.ID(), info.Image, containerd.Stopped, "0s", "0/0", "0/0", "0")
+					fmt.Fprintf(w, tfmt, c.ID(), info.Image, containerd.Stopped, "", "0s", "0/0", "0/0", "0")
 					continue
 				}
 				logrus.WithError(err).Errorf("load task %s", c.ID())
@@ -73,6 +74,7 @@ var listCommand = cli.Command{
 				c.ID(),
 				info.Image,
 				status.Status,
+				info.Labels[config.IPLabel],
 				cpu,
 				fmt.Sprintf("%s/%s", memory, limit),
 				fmt.Sprintf("%d/%d", cg.Pids.Current, cg.Pids.Limit),

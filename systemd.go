@@ -210,6 +210,9 @@ func setupNetworking(ctx context.Context, container containerd.Container, c *con
 		return err
 	}
 	if ip != "" {
+		if err := container.Update(ctx, config.WithIP(ip)); err != nil {
+			logrus.WithError(err).Error("save ip on container")
+		}
 		logrus.WithField("id", container.ID()).WithField("ip", ip).Debug("setup network interface")
 		for name, srv := range c.Services {
 			if err := register.Register(container.ID(), name, ip, srv); err != nil {

@@ -4,6 +4,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/crosbymichael/boss/system"
 	"github.com/crosbymichael/boss/systemd"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
@@ -41,6 +42,7 @@ var deleteCommand = cli.Command{
 			return err
 		}
 		if err := network.Remove(container); err != nil {
+			logrus.Info("remove error")
 			return err
 		}
 		return container.Delete(ctx, containerd.WithSnapshotCleanup)

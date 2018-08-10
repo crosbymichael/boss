@@ -19,6 +19,7 @@ import (
 
 const (
 	Extension = "io.boss/container"
+	IPLabel   = "io/boss/container.ip"
 	Root      = "/var/lib/boss"
 	Net       = "/run/boss/net"
 )
@@ -234,4 +235,15 @@ func withBossResolvconf(ctx context.Context, _ oci.Client, c *containers.Contain
 		Options:     []string{"rbind", "ro"},
 	})
 	return nil
+}
+
+// WithIP sets the ip on the container
+func WithIP(ip string) containerd.UpdateContainerOpts {
+	return func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
+		if c.Labels == nil {
+			c.Labels = make(map[string]string)
+		}
+		c.Labels[IPLabel] = ip
+		return nil
+	}
 }
