@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/archive"
 	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/content"
@@ -213,20 +212,7 @@ var containerdCommand = cli.Command{
 		if err := writeUnit(name, containerdUnit); err != nil {
 			return err
 		}
-		if err := startNewService(ctx, name); err != nil {
-			return err
-		}
-		client, err := system.NewClient()
-		if err != nil {
-			return err
-		}
-		defer client.Close()
-
-		image, err := getImage(ctx, client, "docker.io/crosbymichael/runc:latest", clix, false)
-		if err != nil {
-			return err
-		}
-		return client.Install(ctx, image, containerd.WithInstallReplace, containerd.WithInstallLibs)
+		return startNewService(ctx, name)
 	},
 }
 

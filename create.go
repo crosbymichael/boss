@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+
 	"github.com/BurntSushi/toml"
 	"github.com/containerd/containerd/platforms"
 	"github.com/crosbymichael/boss/config"
@@ -35,7 +37,7 @@ var createCommand = cli.Command{
 			return err
 		}
 		defer client.Close()
-		image, err := getImage(ctx, client, container.Image, clix, true)
+		image, err := getImage(ctx, client, container.Image, clix, os.Stdout, true)
 		if err != nil {
 			return err
 		}

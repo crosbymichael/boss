@@ -238,7 +238,7 @@ func (s *registerStep) run(ctx context.Context, client *containerd.Client, clix 
 }
 
 func install(ctx context.Context, client *containerd.Client, ref string, clix *cli.Context) error {
-	image, err := getImage(ctx, client, ref, clix, false)
+	image, err := getImage(ctx, client, ref, clix, nil, false)
 	if err != nil {
 		return err
 	}

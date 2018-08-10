@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"os"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
@@ -43,7 +44,7 @@ var upgradeCommand = cli.Command{
 			return err
 		}
 		defer done(ctx)
-		image, err := getImage(ctx, client, ref, clix, true)
+		image, err := getImage(ctx, client, ref, clix, os.Stdout, true)
 		if err != nil {
 			return err
 		}

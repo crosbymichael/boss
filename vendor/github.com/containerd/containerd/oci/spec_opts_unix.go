@@ -357,8 +357,8 @@ func WithUIDGID(uid, gid uint32) SpecOpts {
 
 // WithUserID sets the correct UID and GID for the container based
 // on the image's /etc/passwd contents. If /etc/passwd does not exist,
-// or uid is not found in /etc/passwd, it sets gid to be the same with
-// uid, and not returns error.
+// or uid is not found in /etc/passwd, it sets the requested uid,
+// additionally sets the gid to 0, and does not return an error.
 func WithUserID(uid uint32) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) (err error) {
 		setProcess(s)
@@ -371,7 +371,7 @@ func WithUserID(uid uint32) SpecOpts {
 			})
 			if err != nil {
 				if os.IsNotExist(err) || err == errNoUsersFound {
-					s.Process.User.UID, s.Process.User.GID = uid, uid
+					s.Process.User.UID, s.Process.User.GID = uid, 0
 					return nil
 				}
 				return err
@@ -397,7 +397,7 @@ func WithUserID(uid uint32) SpecOpts {
 			})
 			if err != nil {
 				if os.IsNotExist(err) || err == errNoUsersFound {
-					s.Process.User.UID, s.Process.User.GID = uid, uid
+					s.Process.User.UID, s.Process.User.GID = uid, 0
 					return nil
 				}
 				return err
