@@ -1,11 +1,18 @@
 package system
 
 import (
-	"fmt"
+	"io/ioutil"
 	"net"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"syscall"
 
 	"github.com/containerd/containerd"
 	networking "github.com/containerd/go-cni"
+	"github.com/crosbymichael/boss/config"
+	"github.com/pkg/errors"
+	"golang.org/x/sys/unix"
 )
 
 type cni struct {
@@ -13,22 +20,46 @@ type cni struct {
 }
 
 func (n *cni) Create(task containerd.Task) (string, error) {
-	result, err := n.network.Setup(task.ID(), fmt.Sprintf("/proc/%d/ns/net", task.Pid()))
-	if err != nil {
-		return "", err
-	}
-	var ip net.IP
-	for _, ipc := range result.Interfaces["eth0"].IPConfigs {
-		if f := ipc.IP.To4(); f != nil {
-			ip = f
-			break
+	path := filepath.Join(config.Net, task.ID())
+	if _, err := os.Lstat(path); err != nil {
+		if !os.IsNotExist(err) {
+			return "", err
+		}
+		nspath := filepath.Join(path, "ns")
+		if err := createNetns(nspath); err != nil {
+			return "", err
+		}
+		result, err := n.network.Setup(task.ID(), nspath)
+		if err != nil {
+			return "", err
+		}
+		var ip net.IP
+		for _, ipc := range result.Interfaces["eth0"].IPConfigs {
+			if f := ipc.IP.To4(); f != nil {
+				ip = f
+				break
+			}
+		}
+		if err := ioutil.WriteFile(filepath.Join(path, "ip"), []byte(ip.String()), 0666); err != nil {
+			return "", err
 		}
 	}
-	return ip.String(), nil
+	data, err := ioutil.ReadFile(filepath.Join(path, "ip"))
+	return string(data), err
 }
 
-func (n *cni) Remove(_ containerd.Container) error {
-	return nil
+func (n *cni) Remove(c containerd.Container) error {
+	var (
+		path   = filepath.Join(config.Net, c.ID())
+		nspath = filepath.Join(path, "ns")
+	)
+	if err := n.network.Remove(c.ID(), nspath); err != nil {
+		return err
+	}
+	if err := unix.Unmount(nspath, 0); err != nil {
+		return err
+	}
+	return os.RemoveAll(path)
 }
 
 type host struct {
@@ -51,5 +82,17 @@ func (n *none) Create(_ containerd.Task) (string, error) {
 }
 
 func (n *none) Remove(_ containerd.Container) error {
+	return nil
+}
+
+func createNetns(path string) error {
+	cmd := exec.Command("boss", "network", "create", path)
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Cloneflags: unix.CLONE_NEWNET,
+	}
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return errors.Wrap(err, string(out))
+	}
 	return nil
 }

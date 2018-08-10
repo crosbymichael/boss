@@ -34,6 +34,7 @@ run containers like a boss`
 		initCommand,
 		killCommand,
 		listCommand,
+		networkCommand,
 		rollbackCommand,
 		startCommand,
 		stopCommand,

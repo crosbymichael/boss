@@ -28,6 +28,21 @@ var deleteCommand = cli.Command{
 		if err := systemd.Disable(ctx, id); err != nil {
 			return err
 		}
+		c, err := system.Load()
+		if err != nil {
+			return err
+		}
+		config, err := getConfig(ctx, container)
+		if err != nil {
+			return err
+		}
+		network, err := system.GetNetwork(c, config.Network)
+		if err != nil {
+			return err
+		}
+		if err := network.Remove(container); err != nil {
+			return err
+		}
 		return container.Delete(ctx, containerd.WithSnapshotCleanup)
 	},
 }

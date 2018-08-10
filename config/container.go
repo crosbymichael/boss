@@ -20,6 +20,7 @@ import (
 const (
 	Extension = "io.boss/container"
 	Root      = "/var/lib/boss"
+	Net       = "/run/boss/net"
 )
 
 func init() {
@@ -67,8 +68,11 @@ func (config *Container) specOpt(image containerd.Image) oci.SpecOpts {
 	}
 	if config.Network == "host" {
 		opts = append(opts, oci.WithHostHostsFile, oci.WithHostResolvconf, oci.WithHostNamespace(specs.NetworkNamespace))
-	} else {
-		opts = append(opts, withBossResolvconf, withContainerHostsFile)
+	} else if config.Network == "cni" {
+		opts = append(opts, withBossResolvconf, withContainerHostsFile, oci.WithLinuxNamespace(specs.LinuxNamespace{
+			Type: specs.NetworkNamespace,
+			Path: filepath.Join(Net, config.ID, "ns"),
+		}))
 	}
 	if config.Resources != nil {
 		opts = append(opts, withResources(config.Resources))
