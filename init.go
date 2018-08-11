@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -45,7 +47,7 @@ var initCommand = cli.Command{
 		steps = append(steps, &mkdirRoot{}, &bossUnit{})
 		if c.Consul != nil {
 			hasConsul = true
-			steps = append(steps, &consulStep{config: c})
+			steps = append(steps, &consulStep{config: c}, &resolvedStep{Domain: c.Domain})
 			if ips := clix.StringSlice("join"); len(ips) > 0 {
 				steps = append(steps, &joinStep{ips: ips})
 			}
@@ -88,6 +90,17 @@ var initCommand = cli.Command{
 				},
 				port: 9200,
 			})
+		}
+		r := bufio.NewScanner(os.Stdin)
+		for _, s := range steps {
+			fmt.Println("install -> %s", s.name())
+		}
+		fmt.Print("ready to install, continue? (y/n): ")
+		r.Scan()
+		yn := r.Text()
+		if strings.Trim(yn, " \n") == "n" {
+			fmt.Println("ok, aborting... :(")
+			return nil
 		}
 		var (
 			cmu          sync.Mutex
