@@ -9,6 +9,7 @@ import (
 	"github.com/containerd/containerd/pkg/progress"
 	"github.com/crosbymichael/boss/system"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
@@ -134,7 +135,11 @@ var initCommand = cli.Command{
 				fn = s.remove
 			}
 			if err := fn(ctx, client, clix); err != nil {
-				return errors.Wrapf(err, "execute %s", s.name())
+				if clix.Bool("undo") {
+					logrus.WithError(err).Warnf("execute %s", s.name())
+				} else {
+					return errors.Wrapf(err, "execute %s", s.name())
+				}
 			}
 		}
 		ticker.Stop()
