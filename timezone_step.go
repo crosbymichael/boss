@@ -15,7 +15,7 @@ type timezoneStep struct {
 }
 
 func (s *timezoneStep) name() string {
-	return "timezone"
+	return "timezone " + s.config.Timezone
 }
 
 func (s *timezoneStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
