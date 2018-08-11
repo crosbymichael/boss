@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"text/template"
@@ -21,8 +22,6 @@ ff02::1 ip6-allnodes
 ff02::2 ip6-allrouters
 ff02::3 ip6-allhosts`
 
-const resolvConf = `nameserver 127.0.0.1`
-
 type resolvedStep struct {
 	ID string
 }
@@ -38,23 +37,18 @@ func (s *resolvedStep) run(ctx context.Context, client *containerd.Client, clix 
 	if err := systemd.Command(ctx, "stop", "systemd-resolved"); err != nil {
 		return err
 	}
-	t, err := ioutil.TempFile("", "boss-resolvconf")
-	if err != nil {
-		return err
-	}
-	_, err = t.WriteString(resolvConf)
-	t.Close()
-	if err != nil {
-		return err
-	}
-	if err := os.Rename(t.Name(), "/etc/resolv.conf"); err != nil {
+	if err := writeResolveConf("127.0.0.1"); err != nil {
 		return err
 	}
 	tmpl, err := template.New("hosts").Parse(hostsFile)
 	if err != nil {
 		return err
 	}
-	if t, err = ioutil.TempFile("", "boss-hosts"); err != nil {
+	t, err := ioutil.TempFile("", "boss-hosts")
+	if err != nil {
+		return err
+	}
+	if err := t.Chmod(0666); err != nil {
 		return err
 	}
 	err = tmpl.Execute(t, s)
@@ -66,8 +60,26 @@ func (s *resolvedStep) run(ctx context.Context, client *containerd.Client, clix 
 }
 
 func (s *resolvedStep) remove(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
-	if err := systemd.Command(ctx, "enable", "systemd-resolved"); err != nil {
+	return writeResolveConf("8.8.8.8", "8.8.4.4")
+}
+
+func writeResolveConf(nameservers ...string) error {
+	t, err := ioutil.TempFile("", "boss-resolvconf")
+	if err != nil {
 		return err
 	}
-	return systemd.Command(ctx, "start", "systemd-resolved")
+	if err := t.Chmod(0666); err != nil {
+		return err
+	}
+	for _, ns := range nameservers {
+		if _, err := t.WriteString(fmt.Sprintf("nameserver %s\n", ns)); err != nil {
+			t.Close()
+			return err
+		}
+	}
+	t.Close()
+	if err != nil {
+		return err
+	}
+	return os.Rename(t.Name(), "/etc/resolv.conf")
 }

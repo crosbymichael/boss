@@ -47,7 +47,7 @@ var initCommand = cli.Command{
 		steps = append(steps, &mkdirRoot{}, &bossUnit{}, &timezoneStep{config: c})
 		if c.Consul != nil {
 			hasConsul = true
-			steps = append(steps, &consulStep{config: c}, &resolvedStep{ID: c.ID})
+			steps = append(steps, &consulStep{config: c})
 			if ips := clix.StringSlice("join"); len(ips) > 0 {
 				steps = append(steps, &joinStep{ips: ips})
 			}
@@ -90,6 +90,7 @@ var initCommand = cli.Command{
 				},
 				port: 9200,
 			})
+			steps = append(steps, &resolvedStep{ID: c.ID})
 		}
 		r := bufio.NewScanner(os.Stdin)
 
