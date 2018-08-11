@@ -44,17 +44,17 @@ func (c *Consul) registration(id, name, ip string, s config.Service) *api.AgentS
 		Port:    s.Port,
 		Address: ip,
 	}
-	for _, c := range s.Checks {
+	if s.CheckType != "" {
 		var check api.AgentServiceCheck
 		check.Name = name
-		if c.Interval != 0 {
-			check.Interval = fmt.Sprintf("%ds", c.Interval)
+		if s.CheckInterval != 0 {
+			check.Interval = fmt.Sprintf("%ds", s.CheckInterval)
 		}
-		if c.Timeout != 0 {
-			check.Timeout = fmt.Sprintf("%ds", c.Timeout)
+		if s.CheckTimeout != 0 {
+			check.Timeout = fmt.Sprintf("%ds", s.CheckTimeout)
 		}
 		addr := fmt.Sprintf("%s:%d", ip, s.Port)
-		switch c.Type {
+		switch s.CheckType {
 		case config.HTTP:
 			check.HTTP = addr
 		case config.TCP:

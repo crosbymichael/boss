@@ -41,6 +41,40 @@ type Container struct {
 	Services  map[string]Service `toml:"services"`
 }
 
+type Service struct {
+	Port          int       `toml:"port"`
+	Labels        []string  `toml:"labels"`
+	CheckType     CheckType `toml:"check_type"`
+	CheckInterval int       `toml:"check_interval"`
+	CheckTimeout  int       `toml:"check_timeout"`
+}
+
+type CheckType string
+
+const (
+	HTTP CheckType = "http"
+	TCP  CheckType = "tcp"
+	GRPC CheckType = "grpc"
+)
+
+type Resources struct {
+	CPU    float64 `toml:"cpu"`
+	Memory int64   `toml:"memory"`
+	Score  int     `toml:"score"`
+}
+
+type GPUs struct {
+	Devices     []int    `toml:"devices"`
+	Capbilities []string `toml:"capabilities"`
+}
+
+type Mount struct {
+	Type        string   `toml:"type"`
+	Source      string   `toml:"source"`
+	Destination string   `toml:"destination"`
+	Options     []string `toml:"options"`
+}
+
 // WithBossConfig is a containerd.NewContainerOpts for spec and container configuration
 func WithBossConfig(config *Container, image containerd.Image) containerd.NewContainerOpts {
 	return func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
@@ -86,44 +120,6 @@ func (config *Container) specOpt(image containerd.Image) oci.SpecOpts {
 		)
 	}
 	return oci.Compose(opts...)
-}
-
-type Service struct {
-	Port   int      `toml:"port"`
-	Labels []string `toml:"labels"`
-	Checks []Check  `toml:"checks"`
-}
-
-type CheckType string
-
-const (
-	HTTP CheckType = "http"
-	TCP  CheckType = "tcp"
-	GRPC CheckType = "grpc"
-)
-
-type Check struct {
-	Type     CheckType `toml:"type"`
-	Interval int       `toml:"interval"`
-	Timeout  int       `toml:"timeout"`
-}
-
-type Resources struct {
-	CPU    float64 `toml:"cpu"`
-	Memory int64   `toml:"memory"`
-	Score  int     `toml:"score"`
-}
-
-type GPUs struct {
-	Devices     []int    `toml:"devices"`
-	Capbilities []string `toml:"capabilities"`
-}
-
-type Mount struct {
-	Type        string   `toml:"type"`
-	Source      string   `toml:"source"`
-	Destination string   `toml:"destination"`
-	Options     []string `toml:"options"`
 }
 
 func toStrings(ss []string) map[string]string {
