@@ -19,6 +19,7 @@ type Config struct {
 	Consul      *ConsulConfig `toml:"consul"`
 	NodeMetrics *NodeMetrics  `toml:"nodemetrics"`
 	Nameservers []string      `toml:"nameservers"`
+	Timezone    string        `toml:"timezone"`
 }
 
 type ConsulConfig struct {

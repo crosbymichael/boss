@@ -33,6 +33,7 @@ var initCommand = cli.Command{
 		var (
 			hasConsul bool
 			steps     []step
+			undo      = clix.Bool("undo")
 			start     = time.Now()
 		)
 		c, err := system.Load()
@@ -44,7 +45,7 @@ var initCommand = cli.Command{
 			return errors.Wrap(err, "unable to connect to containerd, it's the one thing you have to do...for now")
 		}
 		defer client.Close()
-		steps = append(steps, &mkdirRoot{}, &bossUnit{})
+		steps = append(steps, &mkdirRoot{}, &bossUnit{}, &timezoneStep{config: c})
 		if c.Consul != nil {
 			hasConsul = true
 			steps = append(steps, &consulStep{config: c}, &resolvedStep{Domain: c.Domain})
@@ -92,10 +93,15 @@ var initCommand = cli.Command{
 			})
 		}
 		r := bufio.NewScanner(os.Stdin)
-		for _, s := range steps {
-			fmt.Println("install -> %s", s.name())
+
+		action := "install"
+		if undo {
+			action = "remove"
 		}
-		fmt.Print("ready to install, continue? (y/n): ")
+		for _, s := range steps {
+			fmt.Printf("%s -> %s\n", action, s.name())
+		}
+		fmt.Printf("ready to %s, continue? (y/n): ", action)
 		r.Scan()
 		yn := r.Text()
 		if strings.Trim(yn, " \n") == "n" {

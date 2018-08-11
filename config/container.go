@@ -231,7 +231,7 @@ func withBossResolvconf(ctx context.Context, _ oci.Client, c *containers.Contain
 	s.Mounts = append(s.Mounts, specs.Mount{
 		Destination: "/etc/resolv.conf",
 		Type:        "bind",
-		Source:      filepath.Join(Root, "resolv.conf"),
+		Source:      filepath.Join(Root, c.ID, "resolv.conf"),
 		Options:     []string{"rbind", "ro"},
 	})
 	return nil

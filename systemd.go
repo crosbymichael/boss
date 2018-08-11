@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -48,7 +49,7 @@ var systemdExecStartPreCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		if err := setupResolvConf(c); err != nil {
+		if err := setupResolvConf(id, c); err != nil {
 			return err
 		}
 		if err := setupApparmor(); err != nil {
@@ -231,22 +232,26 @@ func systemdPreSetup(clix *cli.Context) error {
 	return nil
 }
 
-func setupResolvConf(c *config.Config) error {
+func setupResolvConf(id string, c *config.Config) error {
 	servers, err := system.GetNameservers(c)
 	if err != nil {
 		return err
 	}
-	f, err := os.Create(filepath.Join(config.Root, "resolv.conf"))
+	if err := os.MkdirAll(filepath.Join(config.Root, id), 0711); err != nil {
+		return err
+	}
+	f, err := ioutil.TempFile("", "boss-resolvconf")
 	if err != nil {
 		return err
 	}
-	defer f.Close()
 	for _, ns := range servers {
 		if _, err := f.WriteString(fmt.Sprintf("nameserver %s\n", ns)); err != nil {
+			f.Close()
 			return err
 		}
 	}
-	return nil
+	f.Close()
+	return os.Rename(f.Name(), filepath.Join(config.Root, id, "resolv.conf"))
 }
 
 func setupApparmor() error {
