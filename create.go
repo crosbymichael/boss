@@ -25,6 +25,10 @@ var createCommand = cli.Command{
 			Name:  "all-platforms",
 			Usage: "pull content from all platforms",
 		},
+		cli.BoolFlag{
+			Name:  "plain-http",
+			Usage: "don't fetch with https",
+		},
 	},
 	Action: func(clix *cli.Context) error {
 		var container config.Container
