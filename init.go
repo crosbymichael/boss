@@ -34,7 +34,6 @@ var initCommand = cli.Command{
 			hasConsul bool
 			steps     []step
 			undo      = clix.Bool("undo")
-			start     = time.Now()
 		)
 		c, err := system.Load()
 		if err != nil {
@@ -111,6 +110,7 @@ var initCommand = cli.Command{
 		var (
 			cmu          sync.Mutex
 			pwg          sync.WaitGroup
+			start        = time.Now()
 			fw           = progress.NewWriter(os.Stderr)
 			total        = float64(len(steps))
 			ctx          = system.Context()

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"text/template"
@@ -126,7 +127,7 @@ func (s *registerStep) run(ctx context.Context, client *containerd.Client, clix 
 		return err
 	}
 	reg := &api.AgentServiceRegistration{
-		ID:      s.id,
+		ID:      fmt.Sprintf("%s-%s", s.id, s.config.ID),
 		Name:    s.id,
 		Tags:    s.tags,
 		Port:    s.port,
