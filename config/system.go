@@ -14,7 +14,6 @@ type Config struct {
 	ID          string        `toml:"id"`
 	Iface       string        `toml:"iface"`
 	Domain      string        `toml:"domain"`
-	Debug       bool          `toml:"debug"`
 	Buildkit    *Buildkit     `toml:"buildkit"`
 	CNI         *CNI          `toml:"cni"`
 	Consul      *ConsulConfig `toml:"consul"`
@@ -37,8 +36,8 @@ type Buildkit struct {
 }
 
 type CNI struct {
-	Version string `toml:"version" json:"cniVersion,omitempty"`
 	Image   string `toml:"image" json:"-"`
+	Version string `toml:"-" json:"cniVersion,omitempty"`
 	Name    string `toml:"name" json:"name"`
 	Type    string `toml:"type" json:"type"`
 	Master  string `toml:"master" json:"master,omitempty"`

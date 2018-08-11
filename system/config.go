@@ -76,6 +76,14 @@ func GetNetwork(c *config.Config, name string) (Network, error) {
 		if c.CNI == nil {
 			return nil, errors.New("[cni] is not enabled in the system config")
 		}
+		// populate cni data from main config if fields are missing
+		c.CNI.Version = "0.3.1"
+		if c.CNI.Name == "" {
+			c.CNI.Name = c.Domain
+		}
+		if c.CNI.Master == "" {
+			c.CNI.Master = c.Iface
+		}
 		n, err := gocni.New(gocni.WithPluginDir([]string{"/opt/containerd/bin"}), gocni.WithConf(c.CNI.Bytes()), gocni.WithLoNetwork)
 		if err != nil {
 			return nil, err
