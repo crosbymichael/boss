@@ -91,14 +91,11 @@ func (s *resolvedStep) run(ctx context.Context, client *containerd.Client, clix 
 }
 
 func (s *resolvedStep) remove(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
-	t, err := ioutil.TempFile("", "boss-resolved")
-	if err != nil {
+	if err := os.Remove(resolvedConfigPath); err != nil {
 		return err
 	}
-	_, err = t.WriteString(resolvedConf)
-	t.Close()
-	if err != nil {
+	if err := systemd.Command(ctx, "daemon-reload"); err != nil {
 		return err
 	}
-	return os.Rename(t.Name(), resolvedConfigPath)
+	return systemd.Command(ctx, "restart", "systemd-resolved")
 }
