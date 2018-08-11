@@ -263,6 +263,9 @@ func setupResolvConf(id string, c *config.Config) error {
 	if err != nil {
 		return err
 	}
+	if err := f.Chmod(0666); err != nil {
+		return err
+	}
 	for _, ns := range servers {
 		if _, err := f.WriteString(fmt.Sprintf("nameserver %s\n", ns)); err != nil {
 			f.Close()

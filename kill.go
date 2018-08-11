@@ -22,7 +22,7 @@ var killCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		client.Close()
+		defer client.Close()
 		container, err := client.LoadContainer(ctx, id)
 		if err != nil {
 			return err

@@ -48,8 +48,8 @@ var createCommand = cli.Command{
 		if _, err := client.NewContainer(
 			ctx,
 			container.ID,
-			config.WithBossConfig(&container, image),
 			flux.WithNewSnapshot(image),
+			config.WithBossConfig(&container, image),
 		); err != nil {
 			return err
 		}

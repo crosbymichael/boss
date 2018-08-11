@@ -207,6 +207,9 @@ func withContainerHostsFile(ctx context.Context, _ oci.Client, c *containers.Con
 		return err
 	}
 	defer f.Close()
+	if err := f.Chmod(0666); err != nil {
+		return err
+	}
 	if _, err := f.WriteString("127.0.0.1       localhost\n"); err != nil {
 		return err
 	}
