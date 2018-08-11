@@ -78,16 +78,24 @@ func pauseAndRun(ctx context.Context, id string, client *containerd.Client, fn f
 	if err != nil {
 		return err
 	}
+	config, err := getConfig(ctx, container)
+	if err != nil {
+		return err
+	}
 	task, err := container.Task(ctx, nil)
 	if err != nil {
 		return err
 	}
-	if err := register.EnableMaintainance(id, "upgrade image"); err != nil {
-		return err
+	for name := range config.Services {
+		if err := register.EnableMaintainance(id, name, "upgrade image"); err != nil {
+			return err
+		}
 	}
 	defer func() {
-		if err := register.DisableMaintainance(id); err != nil {
-			logrus.WithError(err).Error("disable maintaince")
+		for name := range config.Services {
+			if err := register.DisableMaintainance(id, name); err != nil {
+				logrus.WithError(err).Error("disable maintaince")
+			}
 		}
 	}()
 	if err := task.Pause(ctx); err != nil {

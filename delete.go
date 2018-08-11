@@ -4,7 +4,6 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/crosbymichael/boss/system"
 	"github.com/crosbymichael/boss/systemd"
-	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
@@ -33,6 +32,10 @@ var deleteCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+		register, err := system.GetRegister(c)
+		if err != nil {
+			return err
+		}
 		config, err := getConfig(ctx, container)
 		if err != nil {
 			return err
@@ -42,8 +45,12 @@ var deleteCommand = cli.Command{
 			return err
 		}
 		if err := network.Remove(container); err != nil {
-			logrus.Info("remove error")
 			return err
+		}
+		for name := range config.Services {
+			if err := register.Deregister(id, name); err != nil {
+				return err
+			}
 		}
 		return container.Delete(ctx, containerd.WithSnapshotCleanup)
 	},

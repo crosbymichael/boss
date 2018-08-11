@@ -14,6 +14,7 @@ var startCommand = cli.Command{
 			id  = clix.Args().First()
 			ctx = system.Context()
 		)
+		// FIXME: verify that we acutally have a container with provided id
 		return systemd.Start(ctx, id)
 	},
 }

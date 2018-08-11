@@ -23,16 +23,22 @@ var killCommand = cli.Command{
 			return err
 		}
 		client.Close()
+		container, err := client.LoadContainer(ctx, id)
+		if err != nil {
+			return err
+		}
+		config, err := getConfig(ctx, container)
+		if err != nil {
+			return err
+		}
 		register, err := system.GetRegister(c)
 		if err != nil {
 			return err
 		}
-		if err := register.EnableMaintainance(id, "manual kill"); err != nil {
-			return err
-		}
-		container, err := client.LoadContainer(ctx, id)
-		if err != nil {
-			return err
+		for name := range config.Services {
+			if err := register.EnableMaintainance(id, name, "manual kill"); err != nil {
+				return err
+			}
 		}
 		task, err := container.Task(ctx, nil)
 		if err != nil {

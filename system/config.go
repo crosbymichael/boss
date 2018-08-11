@@ -18,9 +18,9 @@ import (
 // Register is an object that registers and manages service information in its backend
 type Register interface {
 	Register(id, name, ip string, s config.Service) error
-	Deregister(id string) error
-	EnableMaintainance(id, msg string) error
-	DisableMaintainance(id string) error
+	Deregister(id, name string) error
+	EnableMaintainance(id, name, msg string) error
+	DisableMaintainance(id, name string) error
 }
 
 type Network interface {

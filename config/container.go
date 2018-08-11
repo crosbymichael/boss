@@ -44,9 +44,11 @@ type Container struct {
 type Service struct {
 	Port          int       `toml:"port"`
 	Labels        []string  `toml:"labels"`
+	URL           string    `toml:"url"`
 	CheckType     CheckType `toml:"check_type"`
 	CheckInterval int       `toml:"check_interval"`
 	CheckTimeout  int       `toml:"check_timeout"`
+	CheckMethod   string    `toml:"check_method"`
 }
 
 type CheckType string

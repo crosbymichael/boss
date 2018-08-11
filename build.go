@@ -61,6 +61,10 @@ var buildCommand = cli.Command{
 			Name:  "push",
 			Usage: "push the resulting image",
 		},
+		cli.BoolFlag{
+			Name:  "plain-http",
+			Usage: "don't push with https",
+		},
 	},
 	Action: func(clix *cli.Context) error {
 		if err := build(clix); err != nil {
@@ -70,7 +74,7 @@ var buildCommand = cli.Command{
 			return nil
 		}
 		ref := clix.String("name")
-		ctx := namespaces.WithNamespace(context.Background(), clix.GlobalString("namespace"))
+		ctx := namespaces.WithNamespace(context.Background(), "buildkit")
 		client, err := containerd.New(
 			defaults.DefaultAddress,
 			containerd.WithDefaultRuntime("io.containerd.runc.v1"),

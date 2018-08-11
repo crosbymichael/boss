@@ -71,6 +71,13 @@ func (s *consulStep) run(ctx context.Context, client *containerd.Client, clix *c
 }
 
 func (s *consulStep) remove(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
+	consul, err := api.NewClient(api.DefaultConfig())
+	if err != nil {
+		return err
+	}
+	if err := consul.Agent().Leave(); err != nil {
+		return err
+	}
 	if err := client.ImageService().Delete(ctx, s.config.Consul.Image); err != nil {
 		return err
 	}
@@ -110,6 +117,7 @@ type registerStep struct {
 	id     string
 	port   int
 	tags   []string
+	url    string
 	config *config.Config
 }
 

@@ -65,7 +65,21 @@ var systemdExecStartPostCommand = cli.Command{
 	Action: func(clix *cli.Context) error {
 		id := clix.Args().First()
 		err := cleanupPreviousTask(id)
+		ctx := system.Context()
 		c, err := system.Load()
+		if err != nil {
+			return err
+		}
+		client, err := system.NewClient()
+		if err != nil {
+			return err
+		}
+		defer client.Close()
+		container, err := client.LoadContainer(ctx, id)
+		if err != nil {
+			return err
+		}
+		config, err := getConfig(ctx, container)
 		if err != nil {
 			return err
 		}
@@ -73,7 +87,9 @@ var systemdExecStartPostCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		register.EnableMaintainance(id, "task exited")
+		for name := range config.Services {
+			register.EnableMaintainance(id, name, "task exited")
+		}
 		return err
 	},
 }
@@ -108,7 +124,7 @@ var systemdExecStartCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		status, err := monitorTask(ctx, client, task, signals)
+		status, err := monitorTask(ctx, client, task, config, signals)
 		if err != nil {
 			return err
 		}
@@ -117,7 +133,7 @@ var systemdExecStartCommand = cli.Command{
 	},
 }
 
-func monitorTask(ctx context.Context, client *containerd.Client, task containerd.Task, signals chan os.Signal) (int, error) {
+func monitorTask(ctx context.Context, client *containerd.Client, task containerd.Task, config *config.Container, signals chan os.Signal) (int, error) {
 	defer task.Delete(ctx, containerd.WithProcessKill)
 	c, err := system.Load()
 	register, err := system.GetRegister(c)
@@ -138,8 +154,10 @@ func monitorTask(ctx context.Context, client *containerd.Client, task containerd
 			if err != nil {
 				return -1, err
 			}
-			if err := register.DisableMaintainance(task.ID()); err != nil {
-				logrus.WithError(err).Error("disable service maintenance")
+			for name := range config.Services {
+				if err := register.DisableMaintainance(task.ID(), name); err != nil {
+					logrus.WithError(err).Error("disable service maintenance")
+				}
 			}
 		case s := <-signals:
 			if err := trySendSignal(ctx, client, task, s); err != nil {
@@ -212,12 +230,13 @@ func setupNetworking(ctx context.Context, container containerd.Container, c *con
 	}
 	if ip != "" {
 		if err := container.Update(ctx, config.WithIP(ip)); err != nil {
-			logrus.WithError(err).Error("save ip on container")
+			return err
 		}
-		logrus.WithField("id", container.ID()).WithField("ip", ip).Debug("setup network interface")
+		logrus.WithField("id", container.ID()).WithField("ip", ip).Info("setup network interface")
 		for name, srv := range c.Services {
+			logrus.WithField("id", container.ID()).WithField("ip", ip).Infof("registering %s", name)
 			if err := register.Register(container.ID(), name, ip, srv); err != nil {
-				logrus.WithError(err).Error("register service")
+				return err
 			}
 		}
 	}
