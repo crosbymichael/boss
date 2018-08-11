@@ -20,7 +20,7 @@ type cni struct {
 }
 
 func (n *cni) Create(task containerd.Container) (string, error) {
-	path := filepath.Join(config.Net, task.ID())
+	path := filepath.Join(config.State, task.ID())
 	if _, err := os.Lstat(filepath.Join(path, "ip")); err != nil {
 		if !os.IsNotExist(err) {
 			return "", err
@@ -53,7 +53,7 @@ func (n *cni) Create(task containerd.Container) (string, error) {
 
 func (n *cni) Remove(c containerd.Container) error {
 	var (
-		path   = filepath.Join(config.Net, c.ID())
+		path   = filepath.Join(config.State, c.ID())
 		nspath = filepath.Join(path, "ns")
 	)
 	if err := n.network.Remove(c.ID(), nspath); err != nil {
