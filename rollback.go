@@ -29,7 +29,7 @@ var rollbackCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		return pauseAndRun(ctx, id, client, func() error {
+		return pauseAndRun(ctx, container, func() error {
 			if err := container.Update(ctx, flux.WithRollback); err != nil {
 				return err
 			}

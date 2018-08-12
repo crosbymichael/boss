@@ -39,7 +39,7 @@ run containers like a boss`
 		startCommand,
 		stopCommand,
 		systemdCommand,
-		upgradeCommand,
+		updateCommand,
 	}
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprintln(os.Stderr, err)

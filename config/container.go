@@ -78,7 +78,7 @@ type Mount struct {
 }
 
 // WithBossConfig is a containerd.NewContainerOpts for spec and container configuration
-func WithBossConfig(config *Container, image containerd.Image) containerd.NewContainerOpts {
+func WithBossConfig(config *Container, image containerd.Image) func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
 	return func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
 		// generate the spec
 		if err := containerd.WithNewSpec(config.specOpt(image))(ctx, client, c); err != nil {
