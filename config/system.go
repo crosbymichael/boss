@@ -20,6 +20,11 @@ type Network interface {
 	Remove(context.Context, containerd.Container) error
 }
 
+type ConfigStore interface {
+	Write(context.Context, *Container) error
+	Watch(context.Context, containerd.Container, *Container) (<-chan error, error)
+}
+
 const (
 	DefaultRuntime   = "io.containerd.runc.v1"
 	DefaultNamespace = "boss"

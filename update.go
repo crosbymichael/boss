@@ -61,6 +61,10 @@ var updateCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+		store, err := system.GetConfigStore(c)
+		if err != nil {
+			return err
+		}
 		current, err := getConfig(ctx, container)
 		if err != nil {
 			return err
@@ -91,6 +95,10 @@ var updateCommand = cli.Command{
 		changes = append(changes, &configChange{
 			client: client,
 			c:      &newConfig,
+		})
+		changes = append(changes, &filesChange{
+			c:     &newConfig,
+			store: store,
 		})
 		return pauseAndRun(ctx, container, func() error {
 			for _, ch := range changes {

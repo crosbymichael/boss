@@ -3,7 +3,6 @@ package config
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,12 +23,6 @@ const (
 	Root      = "/var/lib/boss"
 	State     = "/run/boss"
 )
-
-type URI string
-
-func (u URI) Parse() (*url.URL, error) {
-	return url.Parse(string(u))
-}
 
 func init() {
 	typeurl.Register(&Container{}, "io.boss.v1.Container")
@@ -53,7 +46,7 @@ type Container struct {
 
 type File struct {
 	Path    string `toml:"path"`
-	Source  URI    `toml:"source"`
+	Source  string `toml:"source"`
 	Content string `toml:"content"`
 	// Signal to be sent when the config changes
 	Signal string `toml:"signal"`
@@ -223,7 +216,7 @@ func withConfigs(files map[string]File) oci.SpecOpts {
 		for name, f := range files {
 			s.Mounts = append(s.Mounts, specs.Mount{
 				Type:        "bind",
-				Source:      filepath.Join(State, "files", c.ID, name),
+				Source:      filepath.Join(State, c.ID, "configs", name),
 				Destination: f.Path,
 				Options: []string{
 					"ro", "rbind",
