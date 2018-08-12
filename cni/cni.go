@@ -65,6 +65,7 @@ func (n *cni) Create(ctx context.Context, task containerd.Container) (string, er
 				return "", err
 			}
 		}
+		return ip.String(), nil
 	}
 	l, err := task.Labels(ctx)
 	if err != nil {
