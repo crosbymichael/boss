@@ -39,8 +39,7 @@ type Config struct {
 }
 
 type ConsulConfig struct {
-	Image     string `toml:"image"`
-	Bootstrap bool   `toml:"bootstrap"`
+	Image string `toml:"image"`
 }
 
 type SSH struct {

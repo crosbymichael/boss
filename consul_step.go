@@ -27,7 +27,8 @@ RestartSec=5
 WantedBy=multi-user.target`
 
 type consulStep struct {
-	config *config.Config
+	config    *config.Config
+	bootstrap bool
 }
 
 func (s *consulStep) name() string {
@@ -56,7 +57,7 @@ func (s *consulStep) run(ctx context.Context, client *containerd.Client, clix *c
 		Domain: s.config.Domain,
 		IP:     ip,
 	}
-	if s.config.Consul.Bootstrap {
+	if s.bootstrap {
 		tmplCtx.Bootstrap = "-bootstrap"
 	}
 	t, err := template.New("consul").Parse(consulUnit)

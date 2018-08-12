@@ -47,8 +47,9 @@ var initCommand = cli.Command{
 		steps = append(steps, &mkdirRoot{}, &bossUnit{}, &timezoneStep{config: c})
 		if c.Consul != nil {
 			hasConsul = true
-			steps = append(steps, &consulStep{config: c})
-			if ips := clix.StringSlice("join"); len(ips) > 0 {
+			ips := clix.StringSlice("join")
+			steps = append(steps, &consulStep{config: c, bootstrap: len(ips) <= 0})
+			if len(ips) > 0 {
 				steps = append(steps, &joinStep{ips: ips})
 			}
 		}
