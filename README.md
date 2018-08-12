@@ -21,6 +21,12 @@ This is my safe space where I only answer to myself.
 Feel free to fork this project and make it something great for your own needs, I encourage it.
 Take the code, try out crazy ideas, experiment, and share your creations with others.
 
+**Warning:**
+
+When consul is enabled, `boss` will remove `systemd-resolved` because it causes so many issues
+with DNS and forwarding to consul to provide DNS and service discovery.
+The old fasion way of `/etc/resolv.conf` works much better without systemd poking with it.
+
 ## CLI
 
 ```
@@ -31,7 +37,7 @@ USAGE:
    boss [global options] command [command options] [arguments...]
 
 VERSION:
-   8
+   9
 
 DESCRIPTION:
 
@@ -60,7 +66,7 @@ COMMANDS:
      rollback  rollback a container to a previous revision
      start     start an existing service
      stop      stop a running service
-     upgrade   upgrade a container's image but keep its data, like it should be
+     update    update an existing container's configuration
      help, h   Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
