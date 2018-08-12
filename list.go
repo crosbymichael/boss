@@ -60,12 +60,13 @@ var listCommand = cli.Command{
 			if err != nil {
 				return err
 			}
-			cg := v.(*cgroups.Metrics)
-			cpu := time.Duration(int64(cg.CPU.Usage.Total))
-			memory := units.HumanSize(float64(cg.Memory.Usage.Usage))
-			limit := units.HumanSize(float64(cg.Memory.Usage.Limit))
-
-			service := client.SnapshotService(info.Snapshotter)
+			var (
+				cg      = v.(*cgroups.Metrics)
+				cpu     = time.Duration(int64(cg.CPU.Usage.Total))
+				memory  = units.HumanSize(float64(cg.Memory.Usage.Usage - cg.Memory.TotalCache))
+				limit   = units.HumanSize(float64(cg.Memory.Usage.Limit))
+				service = client.SnapshotService(info.Snapshotter)
+			)
 			usage, err := service.Usage(ctx, info.SnapshotKey)
 			if err != nil {
 				return err
