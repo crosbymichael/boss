@@ -10,7 +10,7 @@ import (
 func main() {
 	app := cli.NewApp()
 	app.Name = "boss"
-	app.Version = "9"
+	app.Version = "10-dev"
 	app.Usage = "run containers like a ross"
 	app.Description = `
 
