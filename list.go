@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"text/tabwriter"
 	"time"
 
@@ -56,6 +57,11 @@ var listCommand = cli.Command{
 			if err != nil {
 				return err
 			}
+			d := info.Extensions[config.Extension]
+			cfg, err := unmarshalConfig(&d)
+			if err != nil {
+				return err
+			}
 			v, err := typeurl.UnmarshalAny(stats.Data)
 			if err != nil {
 				return err
@@ -71,6 +77,10 @@ var listCommand = cli.Command{
 			if err != nil {
 				return err
 			}
+			bindSizes, err := getBindSizes(cfg)
+			if err != nil {
+				return err
+			}
 			fmt.Fprintf(w, tfmt,
 				c.ID(),
 				info.Image,
@@ -79,9 +89,42 @@ var listCommand = cli.Command{
 				cpu,
 				fmt.Sprintf("%s/%s", memory, limit),
 				fmt.Sprintf("%d/%d", cg.Pids.Current, cg.Pids.Limit),
-				units.HumanSize(float64(usage.Size)),
+				units.HumanSize(float64(usage.Size+bindSizes)),
 			)
 		}
 		return w.Flush()
 	},
+}
+
+func getBindSizes(c *config.Container) (size int64, _ error) {
+	for _, m := range c.Mounts {
+		f, err := os.Open(m.Source)
+		if err != nil {
+			return size, err
+		}
+		info, err := f.Stat()
+		if err != nil {
+			f.Close()
+			return size, err
+		}
+		if info.IsDir() {
+			f.Close()
+			if err := filepath.Walk(m.Source, func(path string, wi os.FileInfo, err error) error {
+				if err != nil {
+					return err
+				}
+				if wi.IsDir() {
+					return nil
+				}
+				size += wi.Size()
+				return nil
+			}); err != nil {
+				return size, err
+			}
+			continue
+		}
+		size += info.Size()
+		f.Close()
+	}
+	return size, nil
 }

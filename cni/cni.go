@@ -62,23 +62,14 @@ func (n *cni) Create(ctx context.Context, task containerd.Container) (string, er
 			return "", err
 		}
 		if n.nt == "macvlan" {
+			route.Remove(ip.String())
 			if err := route.Add(ip.String()); err != nil {
 				return "", err
 			}
 		}
 	}
 	data, err := ioutil.ReadFile(filepath.Join(path, "ip"))
-	if err != nil {
-		return "", err
-	}
-	address := string(data)
-	if n.nt == "macvlan" {
-		route.Remove(address)
-		if err := route.Add(address); err != nil {
-			return "", err
-		}
-	}
-	return address, nil
+	return string(data), err
 }
 
 func (n *cni) Remove(ctx context.Context, c containerd.Container) error {

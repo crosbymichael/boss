@@ -18,6 +18,7 @@ import (
 	"github.com/containerd/typeurl"
 	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/system"
+	"github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -310,7 +311,11 @@ func getConfig(ctx context.Context, container containerd.Container) (*config.Con
 		return nil, err
 	}
 	d := info.Extensions[config.Extension]
-	v, err := typeurl.UnmarshalAny(&d)
+	return unmarshalConfig(&d)
+}
+
+func unmarshalConfig(any *types.Any) (*config.Container, error) {
+	v, err := typeurl.UnmarshalAny(any)
 	if err != nil {
 		return nil, err
 	}
