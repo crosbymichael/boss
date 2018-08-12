@@ -15,10 +15,8 @@ import (
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/typeurl"
 	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/system"
-	"github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -80,7 +78,7 @@ var systemdExecStartPostCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		config, err := getConfig(ctx, container)
+		config, err := config.GetConfig(ctx, container)
 		if err != nil {
 			return err
 		}
@@ -114,7 +112,7 @@ var systemdExecStartCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		config, err := getConfig(ctx, container)
+		config, err := config.GetConfig(ctx, container)
 		if err != nil {
 			return err
 		}
@@ -316,21 +314,4 @@ func cleanupPreviousTask(id string) error {
 	}
 	_, err = task.Delete(ctx, containerd.WithProcessKill)
 	return err
-}
-
-func getConfig(ctx context.Context, container containerd.Container) (*config.Container, error) {
-	info, err := container.Info(ctx)
-	if err != nil {
-		return nil, err
-	}
-	d := info.Extensions[config.Extension]
-	return unmarshalConfig(&d)
-}
-
-func unmarshalConfig(any *types.Any) (*config.Container, error) {
-	v, err := typeurl.UnmarshalAny(any)
-	if err != nil {
-		return nil, err
-	}
-	return v.(*config.Container), nil
 }

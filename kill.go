@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/system"
 	"github.com/urfave/cli"
 	"golang.org/x/sys/unix"
@@ -27,7 +28,7 @@ var killCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		config, err := getConfig(ctx, container)
+		config, err := config.GetConfig(ctx, container)
 		if err != nil {
 			return err
 		}

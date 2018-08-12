@@ -57,8 +57,8 @@ var listCommand = cli.Command{
 			if err != nil {
 				return err
 			}
-			d := info.Extensions[config.Extension]
-			cfg, err := unmarshalConfig(&d)
+			d := info.Extensions[config.CurrentConfig]
+			cfg, err := config.UnmarshalConfig(&d)
 			if err != nil {
 				return err
 			}

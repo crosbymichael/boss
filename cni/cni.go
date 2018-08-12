@@ -2,7 +2,6 @@ package cni
 
 import (
 	"context"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
@@ -35,19 +34,18 @@ type cni struct {
 }
 
 func (n *cni) Create(ctx context.Context, task containerd.Container) (string, error) {
-	path := filepath.Join(config.State, task.ID())
-	if _, err := os.Lstat(filepath.Join(path, "ip")); err != nil {
+	path := config.NetworkPath(task.ID())
+	if _, err := os.Lstat(path); err != nil {
 		if !os.IsNotExist(err) {
 			return "", err
 		}
-		if err := os.MkdirAll(path, 0700); err != nil {
+		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 			return "", err
 		}
-		nspath := filepath.Join(path, "ns")
-		if err := createNetns(nspath); err != nil {
+		if err := createNetns(path); err != nil {
 			return "", err
 		}
-		result, err := n.network.Setup(task.ID(), nspath)
+		result, err := n.network.Setup(task.ID(), path)
 		if err != nil {
 			return "", err
 		}
@@ -58,7 +56,7 @@ func (n *cni) Create(ctx context.Context, task containerd.Container) (string, er
 				break
 			}
 		}
-		if err := ioutil.WriteFile(filepath.Join(path, "ip"), []byte(ip.String()), 0666); err != nil {
+		if err := task.Update(ctx, config.WithIP(ip.String())); err != nil {
 			return "", err
 		}
 		if n.nt == "macvlan" {
@@ -68,19 +66,19 @@ func (n *cni) Create(ctx context.Context, task containerd.Container) (string, er
 			}
 		}
 	}
-	data, err := ioutil.ReadFile(filepath.Join(path, "ip"))
-	return string(data), err
+	l, err := task.Labels(ctx)
+	if err != nil {
+		return "", err
+	}
+	return l[config.IPLabel], nil
 }
 
 func (n *cni) Remove(ctx context.Context, c containerd.Container) error {
-	var (
-		path   = filepath.Join(config.State, c.ID())
-		nspath = filepath.Join(path, "ns")
-	)
-	if err := n.network.Remove(c.ID(), nspath); err != nil {
+	path := config.NetworkPath(c.ID())
+	if err := n.network.Remove(c.ID(), path); err != nil {
 		return err
 	}
-	if err := unix.Unmount(nspath, 0); err != nil {
+	if err := unix.Unmount(path, 0); err != nil {
 		return err
 	}
 	if n.nt == "macvlan" {
@@ -95,7 +93,8 @@ func (n *cni) Remove(ctx context.Context, c containerd.Container) error {
 			}
 		}
 	}
-	return os.RemoveAll(path)
+	// FIXME this could cause issues later but whatever...
+	return os.RemoveAll(filepath.Dir(path))
 }
 
 func createNetns(path string) error {

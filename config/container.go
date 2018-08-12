@@ -14,14 +14,16 @@ import (
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/typeurl"
+	"github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 const (
-	Extension = "io.boss/container"
-	IPLabel   = "io/boss/container.ip"
-	Root      = "/var/lib/boss"
-	State     = "/run/boss"
+	CurrentConfig = "io.boss/container"
+	LastConfig    = "io.boss/container.last"
+	IPLabel       = "io/boss/container.ip"
+	Root          = "/var/lib/boss"
+	state         = "/run/boss"
 )
 
 func init() {
@@ -100,8 +102,22 @@ func WithBossConfig(config *Container, image containerd.Image) func(ctx context.
 			return err
 		}
 		// save the config as a container extension
-		return containerd.WithContainerExtension(Extension, config)(ctx, client, c)
+		return containerd.WithContainerExtension(CurrentConfig, config)(ctx, client, c)
 	}
+}
+
+func WithSetPreviousConfig(ctx context.Context, client *containerd.Client, c *containers.Container) error {
+	c.Extensions[LastConfig] = c.Extensions[CurrentConfig]
+	return nil
+}
+
+func WithRollback(ctx context.Context, client *containerd.Client, c *containers.Container) error {
+	d := c.Extensions[LastConfig]
+	if d.Value == nil {
+		return nil
+	}
+	c.Extensions[CurrentConfig] = d
+	return nil
 }
 
 func (config *Container) specOpt(image containerd.Image) oci.SpecOpts {
@@ -120,7 +136,7 @@ func (config *Container) specOpt(image containerd.Image) oci.SpecOpts {
 	} else if config.Network == "cni" {
 		opts = append(opts, withBossResolvconf, withContainerHostsFile, oci.WithLinuxNamespace(specs.LinuxNamespace{
 			Type: specs.NetworkNamespace,
-			Path: filepath.Join(State, config.ID, "ns"),
+			Path: NetworkPath(config.ID),
 		}))
 	}
 	if config.Resources != nil {
@@ -141,6 +157,18 @@ func (config *Container) specOpt(image containerd.Image) oci.SpecOpts {
 		opts = append(opts, oci.WithUIDGID(uint32(*config.UID), uint32(gid)))
 	}
 	return oci.Compose(opts...)
+}
+
+func StatePath(id string) string {
+	return filepath.Join(state, id)
+}
+
+func NetworkPath(id string) string {
+	return filepath.Join(StatePath(id), "net")
+}
+
+func ConfigPath(id, name string) string {
+	return filepath.Join(StatePath(id), "configs", name)
 }
 
 func toStrings(ss []string) map[string]string {
@@ -216,7 +244,7 @@ func withConfigs(files map[string]File) oci.SpecOpts {
 		for name, f := range files {
 			s.Mounts = append(s.Mounts, specs.Mount{
 				Type:        "bind",
-				Source:      filepath.Join(State, c.ID, "configs", name),
+				Source:      ConfigPath(c.ID, name),
 				Destination: f.Path,
 				Options: []string{
 					"ro", "rbind",
@@ -282,4 +310,21 @@ func WithIP(ip string) containerd.UpdateContainerOpts {
 		c.Labels[IPLabel] = ip
 		return nil
 	}
+}
+
+func GetConfig(ctx context.Context, container containerd.Container) (*Container, error) {
+	info, err := container.Info(ctx)
+	if err != nil {
+		return nil, err
+	}
+	d := info.Extensions[CurrentConfig]
+	return UnmarshalConfig(&d)
+}
+
+func UnmarshalConfig(any *types.Any) (*Container, error) {
+	v, err := typeurl.UnmarshalAny(any)
+	if err != nil {
+		return nil, err
+	}
+	return v.(*Container), nil
 }

@@ -65,7 +65,7 @@ var updateCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		current, err := getConfig(ctx, container)
+		current, err := config.GetConfig(ctx, container)
 		if err != nil {
 			return err
 		}
@@ -85,13 +85,11 @@ var updateCommand = cli.Command{
 				})
 			}
 		}
-		if newConfig.Image != current.Image {
-			changes = append(changes, &imageUpdateChange{
-				ref:    newConfig.Image,
-				clix:   clix,
-				client: client,
-			})
-		}
+		changes = append(changes, &imageUpdateChange{
+			ref:    newConfig.Image,
+			clix:   clix,
+			client: client,
+		})
 		changes = append(changes, &configChange{
 			client: client,
 			c:      &newConfig,

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/flux"
 	"github.com/crosbymichael/boss/system"
 	"github.com/urfave/cli"
@@ -30,7 +31,7 @@ var rollbackCommand = cli.Command{
 			return err
 		}
 		return pauseAndRun(ctx, container, func() error {
-			if err := container.Update(ctx, flux.WithRollback); err != nil {
+			if err := container.Update(ctx, flux.WithRollback, config.WithRollback); err != nil {
 				return err
 			}
 			task, err := container.Task(ctx, nil)

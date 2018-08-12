@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/containerd/containerd"
+	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/system"
 	"github.com/crosbymichael/boss/systemd"
 	"github.com/urfave/cli"
@@ -36,7 +37,7 @@ var deleteCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		config, err := getConfig(ctx, container)
+		config, err := config.GetConfig(ctx, container)
 		if err != nil {
 			return err
 		}

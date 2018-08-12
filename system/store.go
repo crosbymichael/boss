@@ -102,7 +102,7 @@ type Template struct {
 }
 
 func (t *Template) Render(ctx context.Context) error {
-	path := filepath.Join(config.State, t.Container.ID(), "configs", t.Name)
+	path := config.ConfigPath(t.Container.ID(), t.Name)
 	if err := os.MkdirAll(filepath.Dir(path), 0711); err != nil {
 		return err
 	}

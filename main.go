@@ -31,6 +31,7 @@ run containers like a boss`
 		buildCommand,
 		createCommand,
 		deleteCommand,
+		getCommand,
 		initCommand,
 		killCommand,
 		listCommand,
