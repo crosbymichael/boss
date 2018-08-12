@@ -40,7 +40,6 @@ type Container struct {
 	Args      []string           `toml:"args"`
 	UID       *int               `toml:"uid"`
 	GID       *int               `toml:"gid"`
-	Labels    []string           `toml:"labels"`
 	Network   string             `toml:"network"`
 	Services  map[string]Service `toml:"services"`
 	Configs   map[string]File    `toml:"configs"`
@@ -95,10 +94,6 @@ func WithBossConfig(config *Container, image containerd.Image) func(ctx context.
 	return func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
 		// generate the spec
 		if err := containerd.WithNewSpec(config.specOpt(image))(ctx, client, c); err != nil {
-			return err
-		}
-		// set boss labels
-		if err := containerd.WithContainerLabels(toStrings(config.Labels))(ctx, client, c); err != nil {
 			return err
 		}
 		// save the config as a container extension
