@@ -65,6 +65,16 @@ var buildCommand = cli.Command{
 			Name:  "plain-http",
 			Usage: "don't push with https",
 		},
+		cli.StringFlag{
+			Name:  "dockerfile,d",
+			Usage: "set the specific dockerfile",
+			Value: ".",
+		},
+		cli.StringFlag{
+			Name:  "context",
+			Usage: "set the specific context path",
+			Value: ".",
+		},
 	},
 	Action: func(clix *cli.Context) error {
 		if err := build(clix); err != nil {
@@ -213,7 +223,10 @@ func build(clicontext *cli.Context) error {
 	}
 	solveOpt.ExportCacheAttrs = exportCacheAttrs
 
-	solveOpt.LocalDirs, err = attrMap("context=.", "dockerfile=.")
+	solveOpt.LocalDirs, err = attrMap(
+		fmt.Sprintf("context=%s", clicontext.String("context")),
+		fmt.Sprintf("dockerfile=%s", clicontext.String("dockerfile")),
+	)
 	if err != nil {
 		return errors.Wrap(err, "invalid local")
 	}
