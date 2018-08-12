@@ -118,6 +118,22 @@ var systemdExecStartCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+		c, err := system.Load()
+		if err != nil {
+			return err
+		}
+		register, err := system.GetRegister(c)
+		if err != nil {
+			return err
+		}
+		store, err := system.GetConfigStore(c)
+		if err != nil {
+			return err
+		}
+		templateCh, err := store.Watch(ctx, container, config)
+		if err != nil {
+			return err
+		}
 		if err := setupNetworking(ctx, container, config); err != nil {
 			return err
 		}
@@ -125,7 +141,7 @@ var systemdExecStartCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		status, err := monitorTask(ctx, client, task, config, signals)
+		status, err := monitorTask(ctx, client, task, config, register, signals, templateCh)
 		if err != nil {
 			return err
 		}
@@ -134,13 +150,8 @@ var systemdExecStartCommand = cli.Command{
 	},
 }
 
-func monitorTask(ctx context.Context, client *containerd.Client, task containerd.Task, config *config.Container, signals chan os.Signal) (int, error) {
+func monitorTask(ctx context.Context, client *containerd.Client, task containerd.Task, config *config.Container, register config.Register, signals chan os.Signal, templateCh <-chan error) (int, error) {
 	defer task.Delete(ctx, containerd.WithProcessKill)
-	c, err := system.Load()
-	register, err := system.GetRegister(c)
-	if err != nil {
-		return -1, err
-	}
 	started := make(chan error, 1)
 	wait, err := task.Wait(ctx)
 	if err != nil {
@@ -151,6 +162,8 @@ func monitorTask(ctx context.Context, client *containerd.Client, task containerd
 	}()
 	for {
 		select {
+		case err := <-templateCh:
+			logrus.WithError(err).Error("render template")
 		case err := <-started:
 			if err != nil {
 				return -1, err

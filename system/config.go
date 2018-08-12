@@ -3,6 +3,7 @@ package system
 import (
 	"context"
 	"os"
+	"sync"
 
 	"github.com/BurntSushi/toml"
 	"github.com/containerd/containerd"
@@ -49,6 +50,29 @@ func NewClient() (*containerd.Client, error) {
 	)
 }
 
+var (
+	consul     *api.Client
+	consulErr  error
+	consulOnce sync.Once
+)
+
+func getConsul() {
+	consul, consulErr = api.NewClient(api.DefaultConfig())
+}
+
+func GetConfigStore(c *config.Config) (config.ConfigStore, error) {
+	if c.Consul != nil {
+		consulOnce.Do(getConsul)
+		if consulErr != nil {
+			return nil, consulErr
+		}
+		return &configStore{
+			consul: consul,
+		}, nil
+	}
+	return &nullStore{}, nil
+}
+
 // GetNetwork returns a network for the givin name
 func GetNetwork(c *config.Config, name string) (config.Network, error) {
 	ip, err := util.GetIP(c.Iface)
@@ -83,9 +107,9 @@ func GetNetwork(c *config.Config, name string) (config.Network, error) {
 
 func GetRegister(c *config.Config) (config.Register, error) {
 	if c.Consul != nil {
-		consul, err := api.NewClient(api.DefaultConfig())
-		if err != nil {
-			return nil, err
+		consulOnce.Do(getConsul)
+		if consulErr != nil {
+			return nil, consulErr
 		}
 		return &Consul{
 			client: consul,
@@ -96,9 +120,9 @@ func GetRegister(c *config.Config) (config.Register, error) {
 
 func GetNameservers(c *config.Config) ([]string, error) {
 	if c.Consul != nil {
-		consul, err := api.NewClient(api.DefaultConfig())
-		if err != nil {
-			return nil, err
+		consulOnce.Do(getConsul)
+		if consulErr != nil {
+			return nil, consulErr
 		}
 		nodes, _, err := consul.Catalog().Nodes(&api.QueryOptions{})
 		if err != nil {

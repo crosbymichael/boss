@@ -52,6 +52,15 @@ func (c *configChange) update(ctx context.Context, container containerd.Containe
 	return container.Update(ctx, config.WithBossConfig(c.c, image))
 }
 
+type filesChange struct {
+	c     *config.Container
+	store config.ConfigStore
+}
+
+func (c *filesChange) update(ctx context.Context, container containerd.Container) error {
+	return c.store.Write(ctx, c.c)
+}
+
 func pauseAndRun(ctx context.Context, container containerd.Container, fn func() error) error {
 	task, err := container.Task(ctx, nil)
 	if err != nil {

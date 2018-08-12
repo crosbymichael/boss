@@ -21,7 +21,7 @@ const (
 	Extension = "io.boss/container"
 	IPLabel   = "io/boss/container.ip"
 	Root      = "/var/lib/boss"
-	Net       = "/run/boss/net"
+	State     = "/run/boss"
 )
 
 func init() {
@@ -41,6 +41,15 @@ type Container struct {
 	Labels    []string           `toml:"labels"`
 	Network   string             `toml:"network"`
 	Services  map[string]Service `toml:"services"`
+	Configs   map[string]File    `toml:"configs"`
+}
+
+type File struct {
+	Path    string `toml:"path"`
+	Source  string `toml:"source"`
+	Content string `toml:"content"`
+	// Signal to be sent when the config changes
+	Signal string `toml:"signal"`
 }
 
 type Service struct {
@@ -104,13 +113,14 @@ func (config *Container) specOpt(image containerd.Image) oci.SpecOpts {
 		seccomp.WithDefaultProfile(),
 		oci.WithEnv(config.Env),
 		withMounts(config.Mounts),
+		withConfigs(config.Configs),
 	}
 	if config.Network == "host" {
 		opts = append(opts, oci.WithHostHostsFile, oci.WithHostResolvconf, oci.WithHostNamespace(specs.NetworkNamespace))
 	} else if config.Network == "cni" {
 		opts = append(opts, withBossResolvconf, withContainerHostsFile, oci.WithLinuxNamespace(specs.LinuxNamespace{
 			Type: specs.NetworkNamespace,
-			Path: filepath.Join(Net, config.ID, "ns"),
+			Path: filepath.Join(State, config.ID, "ns"),
 		}))
 	}
 	if config.Resources != nil {
@@ -195,6 +205,22 @@ func withMounts(mounts []Mount) oci.SpecOpts {
 				Source:      cm.Source,
 				Destination: cm.Destination,
 				Options:     cm.Options,
+			})
+		}
+		return nil
+	}
+}
+
+func withConfigs(files map[string]File) oci.SpecOpts {
+	return func(ctx context.Context, _ oci.Client, c *containers.Container, s *oci.Spec) error {
+		for name, f := range files {
+			s.Mounts = append(s.Mounts, specs.Mount{
+				Type:        "bind",
+				Source:      filepath.Join(State, c.ID, "configs", name),
+				Destination: f.Path,
+				Options: []string{
+					"ro", "rbind",
+				},
 			})
 		}
 		return nil

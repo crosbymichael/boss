@@ -36,6 +36,10 @@ var createCommand = cli.Command{
 			return err
 		}
 		ctx := system.Context()
+		c, err := system.Load()
+		if err != nil {
+			return err
+		}
 		client, err := system.NewClient()
 		if err != nil {
 			return err
@@ -43,6 +47,13 @@ var createCommand = cli.Command{
 		defer client.Close()
 		image, err := getImage(ctx, client, container.Image, clix, os.Stdout, true)
 		if err != nil {
+			return err
+		}
+		store, err := system.GetConfigStore(c)
+		if err != nil {
+			return err
+		}
+		if err := store.Write(ctx, &container); err != nil {
 			return err
 		}
 		if _, err := client.NewContainer(
