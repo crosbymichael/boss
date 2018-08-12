@@ -36,6 +36,8 @@ type Container struct {
 	Mounts    []Mount            `toml:"mounts"`
 	Env       []string           `toml:"env"`
 	Args      []string           `toml:"args"`
+	UID       *int               `toml:"uid"`
+	GID       *int               `toml:"gid"`
 	Labels    []string           `toml:"labels"`
 	Network   string             `toml:"network"`
 	Services  map[string]Service `toml:"services"`
@@ -120,6 +122,13 @@ func (config *Container) specOpt(image containerd.Image) oci.SpecOpts {
 			nvidia.WithCapabilities(toGpuCaps(config.GPUs.Capbilities)...),
 		),
 		)
+	}
+	if config.UID != nil {
+		gid := 0
+		if config.GID != nil {
+			gid = *config.GID
+		}
+		opts = append(opts, oci.WithUIDGID(uint32(*config.UID), uint32(gid)))
 	}
 	return oci.Compose(opts...)
 }
