@@ -29,6 +29,7 @@ func (s *cniStep) remove(ctx context.Context, client *containerd.Client, clix *c
 
 const dhcpUnit = `[Unit]
 Description=cni dhcp server
+After=network.target
 
 [Service]
 ExecStartPre=/bin/rm -f /run/cni/dhcp.sock

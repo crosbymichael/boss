@@ -11,7 +11,7 @@ import (
 const buildkitUnit = `[Unit]
 Description=buildkit
 Documentation=moby/buildkit
-After=containerd.service
+After=containerd.service network.target
 
 [Service]
 ExecStart=/opt/containerd/bin/buildkitd --containerd-worker=true --oci-worker=false
