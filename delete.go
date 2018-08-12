@@ -44,7 +44,7 @@ var deleteCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		if err := network.Remove(container); err != nil {
+		if err := network.Remove(ctx, container); err != nil {
 			return err
 		}
 		for name := range config.Services {

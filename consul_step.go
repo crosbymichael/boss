@@ -9,7 +9,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/crosbymichael/boss/config"
-	"github.com/crosbymichael/boss/system"
+	"github.com/crosbymichael/boss/util"
 	"github.com/hashicorp/consul/api"
 	"github.com/urfave/cli"
 )
@@ -21,6 +21,7 @@ After=network.target
 [Service]
 ExecStart=/opt/containerd/bin/consul agent {{.Bootstrap}} -server -data-dir=/var/lib/consul -datacenter {{.Domain}} -node {{.ID}} -ui -bind {{.IP}} -client "127.0.0.1 {{.IP}}" -domain {{.Domain}} -recursor 8.8.8.8 -recursor 8.8.4.4 -dns-port 53
 Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target`
@@ -41,7 +42,7 @@ func (s *consulStep) run(ctx context.Context, client *containerd.Client, clix *c
 	if err := os.MkdirAll("/var/lib/consul", 0711); err != nil {
 		return err
 	}
-	ip, err := system.GetIP(s.config.Iface)
+	ip, err := util.GetIP(s.config.Iface)
 	if err != nil {
 		return err
 	}
@@ -127,7 +128,7 @@ func (s *registerStep) name() string {
 }
 
 func (s *registerStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
-	ip, err := system.GetIP(s.config.Iface)
+	ip, err := util.GetIP(s.config.Iface)
 	if err != nil {
 		return err
 	}

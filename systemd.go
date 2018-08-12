@@ -224,7 +224,7 @@ func setupNetworking(ctx context.Context, container containerd.Container, c *con
 	if err != nil {
 		return err
 	}
-	ip, err := network.Create(container)
+	ip, err := network.Create(ctx, container)
 	if err != nil {
 		return err
 	}
