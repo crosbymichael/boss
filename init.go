@@ -72,7 +72,7 @@ var initCommand = cli.Command{
 				steps = append(steps, &registerStep{
 					config: c,
 					id:     "buildkit",
-					port:   9000,
+					port:   9500,
 				})
 			}
 		}
