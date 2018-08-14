@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -17,6 +18,10 @@ type step interface {
 	name() string
 	run(context.Context, *containerd.Client, *cli.Context) error
 	remove(context.Context, *containerd.Client, *cli.Context) error
+}
+
+func registerName(id string) string {
+	return fmt.Sprintf("register %s", id)
 }
 
 type mkdirRoot struct {

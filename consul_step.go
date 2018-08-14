@@ -125,7 +125,7 @@ type registerStep struct {
 }
 
 func (s *registerStep) name() string {
-	return "register " + s.id
+	return registerName(s.id)
 }
 
 func (s *registerStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
