@@ -75,6 +75,7 @@ type Resources struct {
 	CPU    float64 `toml:"cpu"`
 	Memory int64   `toml:"memory"`
 	Score  int     `toml:"score"`
+	NoFile uint64  `toml:"no_file"`
 }
 
 type GPUs struct {
@@ -200,6 +201,15 @@ func withResources(r *Resources) oci.SpecOpts {
 		}
 		if r.Score != 0 {
 			s.Process.OOMScoreAdj = &r.Score
+		}
+		if r.NoFile > 0 {
+			s.Process.Rlimits = []specs.POSIXRlimit{
+				{
+					Type: "RLIMIT_NOFILE",
+					Hard: r.NoFile,
+					Soft: r.NoFile,
+				},
+			}
 		}
 		return nil
 	}
