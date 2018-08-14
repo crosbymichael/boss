@@ -1,5 +1,7 @@
 # boss
 
+[![Build Status](https://travis-ci.org/crosbymichael/boss.svg?branch=master)](https://travis-ci.org/crosbymichael/boss)
+
 ![ross](http://gifs.joelglovier.com/boss/like-a-ross.gif)
 
 **Disclaimer:**
