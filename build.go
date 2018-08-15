@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"strings"
 	"time"
@@ -25,7 +26,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const BossDefaultBuildkitAddress = "tcp://127.0.0.1:9500"
+const BossDefaultBuildkitAddress = "127.0.0.1:9500"
 
 //  sudo buildctl build --frontend=dockerfile.v0 --local context=. --local dockerfile=. --exporter=image --exporter-opt name=registry2
 var buildCommand = cli.Command{
@@ -232,5 +233,15 @@ func resolveClient(c *cli.Context) (*client.Client, error) {
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	return client.New(ctx, c.String("address"), opts...)
+	return client.New(ctx, buildkitProto(c.String("address")), opts...)
+}
+
+func buildkitProto(s string) string {
+	if strings.HasPrefix(s, "unix://") || strings.HasPrefix(s, "tcp://") {
+		return s
+	}
+	if _, _, err := net.SplitHostPort(s); err == nil {
+		return fmt.Sprintf("tcp://%s", s)
+	}
+	return fmt.Sprintf("unix://%s", s)
 }
