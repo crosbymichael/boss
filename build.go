@@ -132,7 +132,11 @@ func build(clicontext *cli.Context) error {
 		Session:     []session.Attachable{authprovider.NewDockerAuthProvider()},
 	}
 	if !clicontext.Bool("no-export") {
-		solveOpt.ExporterAttrs, err = attrMap(fmt.Sprintf("name=%s", clicontext.String("name")))
+		name := clicontext.String("name")
+		if name == "" {
+			return errors.New("name is required when exporting")
+		}
+		solveOpt.ExporterAttrs, err = attrMap(fmt.Sprintf("name=%s", name))
 		if err != nil {
 			return errors.Wrap(err, "invalid exporter-opt")
 		}
