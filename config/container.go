@@ -133,7 +133,9 @@ func (config *Container) specOpt(image containerd.Image) oci.SpecOpts {
 		opts = append(opts, withBossResolvconf, withContainerHostsFile, oci.WithLinuxNamespace(specs.LinuxNamespace{
 			Type: specs.NetworkNamespace,
 			Path: NetworkPath(config.ID),
-		}))
+		}),
+			oci.WithHostname(config.ID),
+		)
 	}
 	if config.Resources != nil {
 		opts = append(opts, withResources(config.Resources))
