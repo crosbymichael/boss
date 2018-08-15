@@ -7,6 +7,7 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/flux"
+	"github.com/crosbymichael/boss/image"
 	"github.com/crosbymichael/boss/system"
 	"github.com/crosbymichael/boss/systemd"
 	"github.com/urfave/cli"
@@ -45,7 +46,7 @@ var createCommand = cli.Command{
 			return err
 		}
 		defer client.Close()
-		image, err := getImage(ctx, client, container.Image, clix, os.Stdout, true)
+		image, err := image.Get(ctx, client, container.Image, clix, os.Stdout, true)
 		if err != nil {
 			return err
 		}

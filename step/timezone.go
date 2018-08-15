@@ -1,4 +1,4 @@
-package main
+package step
 
 import (
 	"context"
@@ -10,16 +10,16 @@ import (
 	"github.com/urfave/cli"
 )
 
-type timezoneStep struct {
-	config *config.Config
+type Timezone struct {
+	Config *config.Config
 }
 
-func (s *timezoneStep) name() string {
-	return "timezone " + s.config.Timezone
+func (s *Timezone) Name() string {
+	return "timezone"
 }
 
-func (s *timezoneStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
-	tz := s.config.Timezone
+func (s *Timezone) Run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
+	tz := s.Config.Timezone
 	if tz == "" {
 		return nil
 	}
@@ -30,6 +30,6 @@ func (s *timezoneStep) run(ctx context.Context, client *containerd.Client, clix 
 	return nil
 }
 
-func (s *timezoneStep) remove(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
+func (s *Timezone) Remove(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
 	return nil
 }

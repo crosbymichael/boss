@@ -9,6 +9,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/flux"
+	"github.com/crosbymichael/boss/image"
 	"github.com/urfave/cli"
 )
 
@@ -23,7 +24,7 @@ type imageUpdateChange struct {
 }
 
 func (c *imageUpdateChange) update(ctx context.Context, container containerd.Container) error {
-	image, err := getImage(ctx, c.client, c.ref, c.clix, os.Stdout, true)
+	image, err := image.Get(ctx, c.client, c.ref, c.clix, os.Stdout, true)
 	if err != nil {
 		return err
 	}

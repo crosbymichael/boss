@@ -1,4 +1,4 @@
-package main
+package step
 
 import (
 	"context"
@@ -18,17 +18,17 @@ Restart=always
 [Install]
 WantedBy=multi-user.target`
 
-type nodeMetricsStep struct {
-	config *config.Config
+type NodeExporter struct {
+	Config *config.Config
 }
 
-func (s *nodeMetricsStep) name() string {
-	return "node exporter"
+func (s *NodeExporter) Name() string {
+	return "node_exporter"
 }
 
-func (s *nodeMetricsStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
+func (s *NodeExporter) Run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
 	const name = "nodeexporter.service"
-	if err := install(ctx, client, s.config.NodeMetrics.Image, clix); err != nil {
+	if err := install(ctx, client, s.Config.NodeMetrics.Image, clix); err != nil {
 		return err
 	}
 	if err := writeUnit(name, metricsUnit); err != nil {
@@ -37,8 +37,8 @@ func (s *nodeMetricsStep) run(ctx context.Context, client *containerd.Client, cl
 	return startNewService(ctx, name)
 }
 
-func (s *nodeMetricsStep) remove(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
-	if err := client.ImageService().Delete(ctx, s.config.NodeMetrics.Image); err != nil {
+func (s *NodeExporter) Remove(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
+	if err := client.ImageService().Delete(ctx, s.Config.NodeMetrics.Image); err != nil {
 		return err
 	}
 	const name = "nodeexporter.service"

@@ -1,4 +1,4 @@
-package main
+package image
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	"github.com/urfave/cli"
 )
 
-func getImage(ctx context.Context, client *containerd.Client, ref string, clix *cli.Context, out io.Writer, unpack bool) (containerd.Image, error) {
+func Get(ctx context.Context, client *containerd.Client, ref string, clix *cli.Context, out io.Writer, unpack bool) (containerd.Image, error) {
 	if unpack {
 		fc, err := content.NewFetchConfig(ctx, clix)
 		if err != nil {

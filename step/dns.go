@@ -1,4 +1,4 @@
-package main
+package step
 
 import (
 	"context"
@@ -22,15 +22,15 @@ ff02::1 ip6-allnodes
 ff02::2 ip6-allrouters
 ff02::3 ip6-allhosts`
 
-type resolvedStep struct {
+type DNS struct {
 	ID string
 }
 
-func (s *resolvedStep) name() string {
+func (s *DNS) Name() string {
 	return "dns"
 }
 
-func (s *resolvedStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
+func (s *DNS) Run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
 	if err := systemd.Command(ctx, "disable", "systemd-resolved"); err != nil {
 		return err
 	}
@@ -59,7 +59,7 @@ func (s *resolvedStep) run(ctx context.Context, client *containerd.Client, clix 
 	return os.Rename(t.Name(), "/etc/hosts")
 }
 
-func (s *resolvedStep) remove(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
+func (s *DNS) Remove(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
 	return writeResolveConf("8.8.8.8", "8.8.4.4")
 }
 

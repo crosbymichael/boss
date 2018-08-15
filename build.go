@@ -14,6 +14,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/crosbymichael/boss/image"
 	"github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/client/llb"
 	"github.com/moby/buildkit/session"
@@ -95,7 +96,7 @@ var buildCommand = cli.Command{
 			return err
 		}
 		defer client.Close()
-		return push(ctx, client, ref, clix)
+		return image.Push(ctx, client, ref, clix)
 	},
 }
 

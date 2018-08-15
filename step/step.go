@@ -1,4 +1,4 @@
-package main
+package step
 
 import (
 	"context"
@@ -9,53 +9,32 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/crosbymichael/boss/config"
+	"github.com/crosbymichael/boss/image"
 	"github.com/crosbymichael/boss/systemd"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
-type step interface {
-	name() string
-	run(context.Context, *containerd.Client, *cli.Context) error
-	remove(context.Context, *containerd.Client, *cli.Context) error
+type Step interface {
+	Name() string
+	Run(context.Context, *containerd.Client, *cli.Context) error
+	Remove(context.Context, *containerd.Client, *cli.Context) error
 }
 
-func registerName(id string) string {
+func DefaultSteps(c *config.Config) []Step {
+	return []Step{
+		&Mkdir{},
+		&Systemd{},
+		&Timezone{Config: c},
+	}
+}
+
+func RegisterName(id string) string {
 	return fmt.Sprintf("register %s", id)
 }
 
-type mkdirRoot struct {
-}
-
-func (s *mkdirRoot) name() string {
-	return "mkdir /var/lib/boss"
-}
-
-func (s *mkdirRoot) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
-	return os.MkdirAll(config.Root, 0711)
-}
-
-func (s *mkdirRoot) remove(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
-	return os.RemoveAll(config.Root)
-}
-
-type bossUnit struct {
-}
-
-func (s *bossUnit) name() string {
-	return "boss unit"
-}
-
-func (s *bossUnit) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
-	return systemd.Install()
-}
-
-func (s *bossUnit) remove(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
-	return systemd.Remove()
-}
-
 func install(ctx context.Context, client *containerd.Client, ref string, clix *cli.Context) error {
-	image, err := getImage(ctx, client, ref, clix, nil, false)
+	image, err := image.Get(ctx, client, ref, clix, nil, false)
 	if err != nil {
 		return err
 	}

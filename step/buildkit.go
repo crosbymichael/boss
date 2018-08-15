@@ -1,4 +1,4 @@
-package main
+package step
 
 import (
 	"context"
@@ -20,17 +20,17 @@ Restart=always
 [Install]
 WantedBy=multi-user.target`
 
-type buildkitStep struct {
-	config *config.Config
+type Buildkit struct {
+	Config *config.Config
 }
 
-func (s *buildkitStep) name() string {
+func (s *Buildkit) Name() string {
 	return "buildkit"
 }
 
-func (s *buildkitStep) run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
+func (s *Buildkit) Run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
 	const name = "buildkit.service"
-	if err := install(ctx, client, s.config.Buildkit.Image, clix); err != nil {
+	if err := install(ctx, client, s.Config.Buildkit.Image, clix); err != nil {
 		return err
 	}
 	if err := writeUnit(name, buildkitUnit); err != nil {
@@ -39,8 +39,8 @@ func (s *buildkitStep) run(ctx context.Context, client *containerd.Client, clix 
 	return startNewService(ctx, name)
 }
 
-func (s *buildkitStep) remove(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
-	if err := client.ImageService().Delete(ctx, s.config.Buildkit.Image); err != nil {
+func (s *Buildkit) Remove(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
+	if err := client.ImageService().Delete(ctx, s.Config.Buildkit.Image); err != nil {
 		return err
 	}
 	const name = "buildkit.service"

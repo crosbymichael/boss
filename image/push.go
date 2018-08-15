@@ -1,4 +1,4 @@
-package main
+package image
 
 import (
 	"context"
@@ -21,7 +21,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func push(ctx context.Context, client *containerd.Client, ref string, clix *cli.Context) error {
+func Push(ctx context.Context, client *containerd.Client, ref string, clix *cli.Context) error {
 	var (
 		local = ref
 		desc  v1.Descriptor
