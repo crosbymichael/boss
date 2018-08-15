@@ -3,6 +3,7 @@ package route
 import (
 	"net"
 	"os/exec"
+	"strings"
 
 	"github.com/crosbymichael/boss/util"
 	"github.com/pkg/errors"
@@ -24,6 +25,10 @@ func Create(iface string) (err error) {
 	if err != nil {
 		return err
 	}
+	parts := strings.Split(address, ".")
+	last := len(parts) - 1
+	parts[last] = "0"
+	address = strings.Join(parts, ".")
 	if err := ip("link", "add", "link", iface, Interface, "type", "macvlan", "mode", "bridge"); err != nil {
 		return err
 	}
