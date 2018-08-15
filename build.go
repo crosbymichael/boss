@@ -73,6 +73,10 @@ var buildCommand = cli.Command{
 			Value:  BossDefaultBuildkitAddress,
 			EnvVar: "BOSS_BUILDKIT",
 		},
+		cli.BoolFlag{
+			Name:  "no-export",
+			Usage: "don't export the build",
+		},
 	},
 	Action: func(clix *cli.Context) error {
 		if err := build(clix); err != nil {
@@ -112,8 +116,13 @@ func build(clicontext *cli.Context) error {
 	ch := make(chan *client.SolveStatus)
 	eg, ctx := errgroup.WithContext(commandContext(clicontext))
 
+	exporter := "image"
+	if clicontext.Bool("no-export") {
+		exporter = ""
+	}
+
 	solveOpt := client.SolveOpt{
-		Exporter: "image",
+		Exporter: exporter,
 		// ExporterAttrs is set later
 		// LocalDirs is set later
 		Frontend: "dockerfile.v0",
@@ -122,16 +131,18 @@ func build(clicontext *cli.Context) error {
 		ImportCache: clicontext.StringSlice("import-cache"),
 		Session:     []session.Attachable{authprovider.NewDockerAuthProvider()},
 	}
-	solveOpt.ExporterAttrs, err = attrMap(fmt.Sprintf("name=%s", clicontext.String("name")))
-	if err != nil {
-		return errors.Wrap(err, "invalid exporter-opt")
-	}
-	solveOpt.ExporterOutput, solveOpt.ExporterOutputDir, err = resolveExporterOutput(solveOpt.Exporter, solveOpt.ExporterAttrs["output"])
-	if err != nil {
-		return errors.Wrap(err, "invalid exporter-opt: output")
-	}
-	if solveOpt.ExporterOutput != nil || solveOpt.ExporterOutputDir != "" {
-		delete(solveOpt.ExporterAttrs, "output")
+	if !clicontext.Bool("no-export") {
+		solveOpt.ExporterAttrs, err = attrMap(fmt.Sprintf("name=%s", clicontext.String("name")))
+		if err != nil {
+			return errors.Wrap(err, "invalid exporter-opt")
+		}
+		solveOpt.ExporterOutput, solveOpt.ExporterOutputDir, err = resolveExporterOutput(solveOpt.Exporter, solveOpt.ExporterAttrs["output"])
+		if err != nil {
+			return errors.Wrap(err, "invalid exporter-opt: output")
+		}
+		if solveOpt.ExporterOutput != nil || solveOpt.ExporterOutputDir != "" {
+			delete(solveOpt.ExporterAttrs, "output")
+		}
 	}
 
 	exportCacheAttrs, err := attrMap(clicontext.StringSlice("export-cache-opt")...)
