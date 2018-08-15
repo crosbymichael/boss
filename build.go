@@ -68,9 +68,10 @@ var buildCommand = cli.Command{
 			Value: ".",
 		},
 		cli.StringFlag{
-			Name:  "address",
-			Usage: "buildkitd address",
-			Value: BossDefaultBuildkitAddress,
+			Name:   "address",
+			Usage:  "buildkitd address",
+			Value:  BossDefaultBuildkitAddress,
+			EnvVar: "BOSS_BUILDKIT",
 		},
 	},
 	Action: func(clix *cli.Context) error {
