@@ -77,6 +77,7 @@ var initCommand = cli.Command{
 					config: c,
 					id:     "buildkit",
 					port:   9500,
+					tags:   []string{"build"},
 				})
 			}
 		}
