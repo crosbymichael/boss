@@ -9,6 +9,7 @@ import (
 	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/typeurl"
 	"github.com/crosbymichael/boss/api/v1"
 	"github.com/crosbymichael/boss/config"
@@ -46,6 +47,7 @@ type Agent struct {
 }
 
 func (a *Agent) Create(ctx context.Context, req *v1.CreateRequest) (*types.Empty, error) {
+	ctx = relayContext(ctx)
 	image, err := a.pull(ctx, req.Container.Image)
 	if err != nil {
 		return nil, err
@@ -72,6 +74,7 @@ func (a *Agent) Create(ctx context.Context, req *v1.CreateRequest) (*types.Empty
 }
 
 func (a *Agent) Delete(ctx context.Context, req *v1.DeleteRequest) (*types.Empty, error) {
+	ctx = relayContext(ctx)
 	id := req.ID
 	if id == "" {
 		return nil, ErrNoID
@@ -106,6 +109,7 @@ func (a *Agent) Delete(ctx context.Context, req *v1.DeleteRequest) (*types.Empty
 }
 
 func (a *Agent) Get(ctx context.Context, req *v1.GetRequest) (*v1.GetResponse, error) {
+	ctx = relayContext(ctx)
 	id := req.ID
 	if id == "" {
 		return nil, ErrNoID
@@ -187,6 +191,7 @@ func (a *Agent) listContainer(ctx context.Context, c containerd.Container) (*v1.
 
 func (a *Agent) List(ctx context.Context, req *v1.ListRequest) (*v1.ListResponse, error) {
 	var resp v1.ListResponse
+	ctx = relayContext(ctx)
 	containers, err := a.client.Containers(ctx)
 	if err != nil {
 		return nil, err
@@ -207,6 +212,7 @@ func (a *Agent) List(ctx context.Context, req *v1.ListRequest) (*v1.ListResponse
 }
 
 func (a *Agent) Kill(ctx context.Context, req *v1.KillRequest) (*types.Empty, error) {
+	ctx = relayContext(ctx)
 	id := req.ID
 	if id == "" {
 		return nil, ErrNoID
@@ -235,6 +241,7 @@ func (a *Agent) Kill(ctx context.Context, req *v1.KillRequest) (*types.Empty, er
 }
 
 func (a *Agent) Start(ctx context.Context, req *v1.StartRequest) (*types.Empty, error) {
+	ctx = relayContext(ctx)
 	id := req.ID
 	if id == "" {
 		return nil, ErrNoID
@@ -243,6 +250,7 @@ func (a *Agent) Start(ctx context.Context, req *v1.StartRequest) (*types.Empty, 
 }
 
 func (a *Agent) Stop(ctx context.Context, req *v1.StopRequest) (*types.Empty, error) {
+	ctx = relayContext(ctx)
 	id := req.ID
 	if id == "" {
 		return nil, ErrNoID
@@ -251,6 +259,7 @@ func (a *Agent) Stop(ctx context.Context, req *v1.StopRequest) (*types.Empty, er
 }
 
 func (a *Agent) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateResponse, error) {
+	ctx = relayContext(ctx)
 	ctx, done, err := a.client.WithLease(ctx)
 	if err != nil {
 		return nil, err
@@ -315,6 +324,7 @@ func (a *Agent) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateRe
 }
 
 func (a *Agent) Rollback(ctx context.Context, req *v1.RollbackRequest) (*v1.RollbackResponse, error) {
+	ctx = relayContext(ctx)
 	ctx, done, err := a.client.WithLease(ctx)
 	if err != nil {
 		return nil, err
@@ -384,4 +394,8 @@ func getBindSizes(c *v1.Container) (size int64, _ error) {
 		f.Close()
 	}
 	return size, nil
+}
+
+func relayContext(ctx context.Context) context.Context {
+	return namespaces.WithNamespace(ctx, v1.DefaultNamespace)
 }
