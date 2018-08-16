@@ -47,6 +47,7 @@ run containers like a boss`
 		return nil
 	}
 	app.Commands = []cli.Command{
+		agentCommand,
 		buildCommand,
 		createCommand,
 		deleteCommand,

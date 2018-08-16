@@ -31,16 +31,22 @@ var createCommand = cli.Command{
 		if _, err := toml.DecodeFile(clix.Args().First(), &container); err != nil {
 			return err
 		}
-		conn, err := grpc.Dial(clix.GlobalString("agent"), grpc.WithInsecure())
+		agent, err := Agent(clix)
 		if err != nil {
 			return err
 		}
-		defer conn.Close()
-		agent := v1.NewAgentClient(conn)
-
 		_, err = agent.Create(Context(), &v1.CreateRequest{
 			Container: container.Proto(),
 		})
 		return err
 	},
+}
+
+func Agent(clix *cli.Context) (v1.AgentClient, error) {
+	conn, err := grpc.Dial(clix.GlobalString("agent"), grpc.WithInsecure())
+	if err != nil {
+		return nil, err
+	}
+	// TODO close conn
+	return v1.NewAgentClient(conn), nil
 }
