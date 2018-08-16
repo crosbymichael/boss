@@ -8,8 +8,7 @@ import (
 )
 
 const (
-	LastConfig = "io.boss/container.last"
-	IPLabel    = "io/boss/container.ip"
+	IPLabel = "io/boss/container.ip"
 )
 
 // WithIP sets the ip on the container

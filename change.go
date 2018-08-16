@@ -7,6 +7,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/crosbymichael/boss/api/v1"
 	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/flux"
 	"github.com/crosbymichael/boss/image"
@@ -32,7 +33,7 @@ func (c *imageUpdateChange) update(ctx context.Context, container containerd.Con
 }
 
 type deregisterChange struct {
-	register config.Register
+	register v1.Register
 	name     string
 }
 
@@ -41,7 +42,7 @@ func (c *deregisterChange) update(ctx context.Context, container containerd.Cont
 }
 
 type configChange struct {
-	c      *config.Container
+	c      *v1.Container
 	client *containerd.Client
 }
 
@@ -50,11 +51,11 @@ func (c *configChange) update(ctx context.Context, container containerd.Containe
 	if err != nil {
 		return err
 	}
-	return container.Update(ctx, config.WithSetPreviousConfig, config.WithBossConfig(c.c, image))
+	return container.Update(ctx, v1.WithSetPreviousConfig, v1.WithBossConfig(c.c, image))
 }
 
 type filesChange struct {
-	c     *config.Container
+	c     *v1.Container
 	store config.ConfigStore
 }
 

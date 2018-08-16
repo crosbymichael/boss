@@ -1,12 +1,12 @@
-package system
+package config
 
-import "github.com/crosbymichael/boss/config"
+import "github.com/crosbymichael/boss/api/v1"
 
 type nullRegister struct {
 }
 
 // Register sends the provided service registration to the local agent
-func (c *nullRegister) Register(id, name, ip string, s config.Service) error {
+func (c *nullRegister) Register(id, name, ip string, s *v1.Service) error {
 	return nil
 }
 

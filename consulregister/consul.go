@@ -1,12 +1,18 @@
-package system
+package consulregister
 
 import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/crosbymichael/boss/config"
+	"github.com/crosbymichael/boss/api/v1"
 	"github.com/hashicorp/consul/api"
 )
+
+func New(client *api.Client) *Consul {
+	return &Consul{
+		client: client,
+	}
+}
 
 // Consul is a connection to the local consul agent
 type Consul struct {
@@ -14,7 +20,7 @@ type Consul struct {
 }
 
 // Register sends the provided service registration to the local agent
-func (c *Consul) Register(id, name, ip string, s config.Service) error {
+func (c *Consul) Register(id, name, ip string, s *v1.Service) error {
 	reg := c.registration(id, name, ip, s)
 	if err := c.client.Agent().ServiceRegister(reg); err != nil {
 		return err
@@ -37,36 +43,36 @@ func (c *Consul) DisableMaintainance(id, name string) error {
 	return c.client.Agent().DisableServiceMaintenance(serviceID(id, name))
 }
 
-func (c *Consul) registration(id, name, ip string, s config.Service) *api.AgentServiceRegistration {
+func (c *Consul) registration(id, name, ip string, s *v1.Service) *api.AgentServiceRegistration {
 	reg := &api.AgentServiceRegistration{
 		ID:      serviceID(id, name),
 		Name:    name,
 		Tags:    s.Labels,
-		Port:    s.Port,
+		Port:    int(s.Port),
 		Address: ip,
 	}
-	if s.CheckType != "" {
+	if s.Check != nil {
 		var check api.AgentServiceCheck
 		check.Name = name
-		if s.CheckInterval == 0 {
-			s.CheckInterval = 10
+		if s.Check.Interval == 0 {
+			s.Check.Interval = 10
 		}
-		check.Interval = fmt.Sprintf("%ds", s.CheckInterval)
-		if s.CheckTimeout != 0 {
-			check.Timeout = fmt.Sprintf("%ds", s.CheckTimeout)
+		check.Interval = fmt.Sprintf("%ds", s.Check.Interval)
+		if s.Check.Timeout != 0 {
+			check.Timeout = fmt.Sprintf("%ds", s.Check.Timeout)
 		}
 		addr := fmt.Sprintf("%s:%d", ip, s.Port)
-		switch s.CheckType {
-		case config.HTTP:
-			url := s.URL
+		switch s.Check.Type {
+		case "http":
+			url := s.Url
 			if url != "" {
 				url = filepath.Join("/", url)
 			}
 			check.HTTP = fmt.Sprintf("http://%s%s", addr, url)
-			check.Method = s.CheckMethod
-		case config.TCP:
+			check.Method = s.Check.Method
+		case "tcp":
 			check.TCP = addr
-		case config.GRPC:
+		case "grpc":
 			check.GRPC = addr
 		}
 		reg.Checks = append(reg.Checks, &check)
