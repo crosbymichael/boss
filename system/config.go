@@ -19,5 +19,6 @@ func NewClient() (*containerd.Client, error) {
 	return containerd.New(
 		defaults.DefaultAddress,
 		containerd.WithDefaultRuntime(v1.DefaultRuntime),
+		containerd.WithDefaultNamespace(v1.DefaultNamespace),
 	)
 }

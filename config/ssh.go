@@ -23,7 +23,6 @@ Subsystem       sftp    /usr/lib/openssh/sftp-server`
 type SSH struct {
 	Admin  string `toml:"admin"`
 	Config bool   `toml:"sshd_config"`
-	// AuthorizedKeys string `toml:"authorized_keys"`
 }
 
 func (m *SSH) Name() string {
