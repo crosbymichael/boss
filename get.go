@@ -30,7 +30,6 @@ var getCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-
 		return toml.NewEncoder(os.Stdout).Encode(config)
 	},
 }

@@ -8,4 +8,129 @@ import "google/protobuf/empty.proto";
 option go_package = "github.com/crosbymichael/boss/api/v1;v1";
 
 service Agent {
+	rpc Create(CreateRequest) returns (google.protobuf.Empty);
+	rpc Delete(DeleteRequest) returns (google.protobuf.Empty);
+	rpc Get(GetRequest) returns (GetResponse);
+	rpc Kill(KillRequest) returns (google.protobuf.Empty);
+	rpc List(ListRequest) returns (ListResponse);
+	rpc Rollback(RollbackRequest) returns (RollbackResponse);
+	rpc Start(StartRequest) returns (google.protobuf.Empty);
+	rpc Stop(StopRequest) returns (google.protobuf.Empty);
+	rpc Update(UpdateRequest) returns (UpdateResponse);
+}
+
+message CreateRequest {
+	Container container = 1;
+}
+
+message DeleteRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];;
+}
+
+message GetRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];;
+}
+
+message GetResponse {
+	Container container = 1;
+}
+
+message KillRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];;
+	uint32 signal = 2;
+}
+
+message ListRequest {
+
+}
+
+message ListResponse {
+	repeated Container containers = 1;
+}
+
+message RollbackRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];;
+}
+
+message RollbackResponse {
+	Container container = 1;
+}
+
+message StartRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];;
+}
+
+message StopRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];;
+}
+
+message UpdateRequest {
+	Container container = 1;
+}
+
+message UpdateResponse {
+	Container container = 1;
+}
+
+message Container {
+	string id = 1 [(gogoproto.customname) = "ID"];;
+	string image = 2;
+	string network = 3;
+	Process process = 4;
+	repeated Mount mounts = 5;
+	Resources resources = 6;
+	GPUs gpus = 7;
+	map<string, Service> services = 8;
+	map<string, Config> configs = 9;
+}
+
+message Config {
+	string path = 1;
+	string source = 2;
+	string signal = 3;
+	string content = 4;
+}
+
+message Service {
+	int64 port = 1;
+	repeated string labels = 2;
+	string url = 3;
+	HealthCheck check = 4;
+}
+
+message HealthCheck {
+	string type = 1;
+	int64 interval = 2;
+	int64 timeout = 3;
+	string method = 4;
+}
+
+message GPUs {
+	repeated int64 devices = 1;
+	repeated string capabilities = 2;
+}
+
+message Resources {
+	double cpus = 1;
+	int64 memory = 2;
+	int64 score = 3;
+	uint64 no_file = 4;
+}
+
+message Mount {
+	string type = 1;
+	string source = 2;
+	string destination = 3;
+	repeated string options = 4;
+}
+
+message Process {
+	User user = 1;
+	repeated string args = 2;
+	repeated string env = 3;
+}
+
+message User {
+	uint32 uid = 1;
+	uint32 gid = 2;
 }

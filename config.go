@@ -1,4 +1,4 @@
-package config
+package main
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/box/box/config/v1"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/contrib/apparmor"
@@ -14,21 +15,14 @@ import (
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/typeurl"
+	"github.com/crosbymichael/boss/config"
 	"github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 const (
 	CurrentConfig = "io.boss/container"
-	LastConfig    = "io.boss/container.last"
-	IPLabel       = "io/boss/container.ip"
-	Root          = "/var/lib/boss"
-	state         = "/run/boss"
 )
-
-func init() {
-	typeurl.Register(&Container{}, "io.boss.v1.Container")
-}
 
 type Container struct {
 	ID        string             `toml:"id"`
@@ -43,6 +37,11 @@ type Container struct {
 	Network   string             `toml:"network"`
 	Services  map[string]Service `toml:"services"`
 	Configs   map[string]File    `toml:"configs"`
+}
+
+func (c *Container) Proto() *v1.Container {
+	panic("proto not done")
+	return nil
 }
 
 type File struct {
@@ -157,18 +156,6 @@ func (config *Container) specOpt(image containerd.Image) oci.SpecOpts {
 	return oci.Compose(opts...)
 }
 
-func StatePath(id string) string {
-	return filepath.Join(state, id)
-}
-
-func NetworkPath(id string) string {
-	return filepath.Join(StatePath(id), "net")
-}
-
-func ConfigPath(id, name string) string {
-	return filepath.Join(StatePath(id), "configs", name)
-}
-
 func toStrings(ss []string) map[string]string {
 	m := make(map[string]string, len(ss))
 	for _, s := range ss {
@@ -264,14 +251,14 @@ func withConfigs(files map[string]File) oci.SpecOpts {
 
 func withContainerHostsFile(ctx context.Context, _ oci.Client, c *containers.Container, s *oci.Spec) error {
 	id := c.ID
-	if err := os.MkdirAll(filepath.Join(Root, id), 0711); err != nil {
+	if err := os.MkdirAll(filepath.Join(config.Root, id), 0711); err != nil {
 		return err
 	}
 	hostname := s.Hostname
 	if hostname == "" {
 		hostname = id
 	}
-	path := filepath.Join(Root, id, "hosts")
+	path := filepath.Join(config.Root, id, "hosts")
 	f, err := os.Create(path)
 	if err != nil {
 		return err
@@ -302,21 +289,10 @@ func withBossResolvconf(ctx context.Context, _ oci.Client, c *containers.Contain
 	s.Mounts = append(s.Mounts, specs.Mount{
 		Destination: "/etc/resolv.conf",
 		Type:        "bind",
-		Source:      filepath.Join(Root, c.ID, "resolv.conf"),
+		Source:      filepath.Join(config.Root, c.ID, "resolv.conf"),
 		Options:     []string{"rbind", "ro"},
 	})
 	return nil
-}
-
-// WithIP sets the ip on the container
-func WithIP(ip string) containerd.UpdateContainerOpts {
-	return func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
-		if c.Labels == nil {
-			c.Labels = make(map[string]string)
-		}
-		c.Labels[IPLabel] = ip
-		return nil
-	}
 }
 
 func GetConfig(ctx context.Context, container containerd.Container) (*Container, error) {

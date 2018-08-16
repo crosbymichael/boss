@@ -1,4 +1,4 @@
-package system
+package config
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
-	"github.com/crosbymichael/boss/config"
+	"github.com/crosbymichael/boss/api/v1"
 	"github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
@@ -21,14 +21,14 @@ var ErrConfigStoreNotSupported = errors.New("config store not enabled, you need 
 type nullStore struct {
 }
 
-func (l *nullStore) Write(_ context.Context, c *config.Container) error {
+func (l *nullStore) Write(_ context.Context, c *v1.Container) error {
 	if len(c.Configs) > 0 {
 		return ErrConfigStoreNotSupported
 	}
 	return nil
 }
 
-func (l *nullStore) Watch(_ context.Context, _ containerd.Container, _ *config.Container) (<-chan error, error) {
+func (l *nullStore) Watch(_ context.Context, _ containerd.Container, _ *v1.Container) (<-chan error, error) {
 	return make(chan error), nil
 }
 
@@ -36,7 +36,7 @@ type configStore struct {
 	consul *api.Client
 }
 
-func (l *configStore) Write(ctx context.Context, c *config.Container) error {
+func (l *configStore) Write(ctx context.Context, c *v1.Container) error {
 	kv := l.consul.KV()
 	for _, f := range c.Configs {
 		if f.Content == "" {
@@ -56,7 +56,7 @@ func (l *configStore) Write(ctx context.Context, c *config.Container) error {
 	return nil
 }
 
-func (l *configStore) Watch(ctx context.Context, c containerd.Container, cfg *config.Container) (<-chan error, error) {
+func (l *configStore) Watch(ctx context.Context, c containerd.Container, cfg *v1.Container) (<-chan error, error) {
 	var (
 		ch = make(chan error, len(cfg.Configs))
 		kv = l.consul.KV()
@@ -96,13 +96,13 @@ type Template struct {
 	Index     uint64
 	Container containerd.Container
 	Name      string
-	File      config.File
+	File      *v1.Config
 	Data      []byte
 	Spec      *oci.Spec
 }
 
 func (t *Template) Render(ctx context.Context) error {
-	path := config.ConfigPath(t.Container.ID(), t.Name)
+	path := v1.ConfigPath(t.Container.ID(), t.Name)
 	if err := os.MkdirAll(filepath.Dir(path), 0711); err != nil {
 		return err
 	}

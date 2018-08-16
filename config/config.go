@@ -2,33 +2,51 @@ package config
 
 import (
 	"context"
+	"os"
+	"sync"
 
+	"github.com/BurntSushi/toml"
 	"github.com/containerd/containerd"
+	"github.com/crosbymichael/boss/api/v1"
+	"github.com/hashicorp/consul/api"
 )
 
-// Register is an object that registers and manages service information in its backend
-type Register interface {
-	Register(id, name, ip string, s Service) error
-	Deregister(id, name string) error
-	EnableMaintainance(id, name, msg string) error
-	DisableMaintainance(id, name string) error
-}
-
-type Network interface {
-	Create(context.Context, containerd.Container) (string, error)
-	Remove(context.Context, containerd.Container) error
-}
+const Path = "/etc/boss/boss.toml"
 
 type ConfigStore interface {
-	Write(context.Context, *Container) error
-	Watch(context.Context, containerd.Container, *Container) (<-chan error, error)
+	Write(context.Context, *v1.Container) error
+	Watch(context.Context, containerd.Container, *v1.Container) (<-chan error, error)
 }
 
-const (
-	DefaultRuntime   = "io.containerd.runc.v1"
-	DefaultNamespace = "boss"
-	Path             = "/etc/boss/boss.toml"
+// Load the system config from disk
+// fix up any missing fields with runtime data
+func Load() (*Config, error) {
+	var c Config
+	if _, err := toml.DecodeFile(Path, &c); err != nil {
+		return nil, err
+	}
+	if c.ID == "" {
+		id, err := os.Hostname()
+		if err != nil {
+			return nil, err
+		}
+		c.ID = id
+	}
+	if c.Iface == "" {
+		c.Iface = "eth0"
+	}
+	return &c, nil
+}
+
+var (
+	consul     *api.Client
+	consulErr  error
+	consulOnce sync.Once
 )
+
+func getConsul() {
+	consul, consulErr = api.NewClient(api.DefaultConfig())
+}
 
 type Config struct {
 	ID           string        `toml:"id"`
@@ -42,6 +60,19 @@ type Config struct {
 	Timezone     string        `toml:"timezone"`
 	MOTD         *MOTD         `toml:"motd"`
 	SSH          *SSH          `toml:"ssh"`
+}
+
+func (c *Config) Store() (ConfigStore, error) {
+	if c.Consul != nil {
+		consulOnce.Do(getConsul)
+		if consulErr != nil {
+			return nil, consulErr
+		}
+		return &configStore{
+			consul: consul,
+		}, nil
+	}
+	return &nullStore{}, nil
 }
 
 func (c *Config) Steps() []Step {

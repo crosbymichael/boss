@@ -1,16 +1,12 @@
 package main
 
 import (
-	"os"
-
 	"github.com/BurntSushi/toml"
 	"github.com/containerd/containerd/platforms"
+	"github.com/crosbymichael/boss/api/v1"
 	"github.com/crosbymichael/boss/config"
-	"github.com/crosbymichael/boss/flux"
-	"github.com/crosbymichael/boss/image"
-	"github.com/crosbymichael/boss/system"
-	"github.com/crosbymichael/boss/systemd"
 	"github.com/urfave/cli"
+	"google.golang.org/grpc"
 )
 
 var createCommand = cli.Command{
@@ -36,38 +32,16 @@ var createCommand = cli.Command{
 		if _, err := toml.DecodeFile(clix.Args().First(), &container); err != nil {
 			return err
 		}
-		ctx := system.Context()
-		c, err := system.Load()
+		conn, err := grpc.Dial(clix.GlobalString("agent"), grpc.WithInsecure())
 		if err != nil {
 			return err
 		}
-		client, err := system.NewClient()
-		if err != nil {
-			return err
-		}
-		defer client.Close()
-		image, err := image.Get(ctx, client, container.Image, clix, os.Stdout, true)
-		if err != nil {
-			return err
-		}
-		store, err := system.GetConfigStore(c)
-		if err != nil {
-			return err
-		}
-		if err := store.Write(ctx, &container); err != nil {
-			return err
-		}
-		if _, err := client.NewContainer(
-			ctx,
-			container.ID,
-			flux.WithNewSnapshot(image),
-			config.WithBossConfig(&container, image),
-		); err != nil {
-			return err
-		}
-		if err := systemd.Enable(ctx, container.ID); err != nil {
-			return err
-		}
-		return systemd.Start(ctx, container.ID)
+		defer conn.Close()
+		agent := v1.NewAgentClient(conn)
+
+		_, err = agent.Create(Context(), &v1.CreateRequest{
+			Container: container.Proto(),
+		})
+		return err
 	},
 }
