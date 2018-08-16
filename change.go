@@ -51,7 +51,7 @@ func (c *configChange) update(ctx context.Context, container containerd.Containe
 	if err != nil {
 		return err
 	}
-	return container.Update(ctx, v1.WithSetPreviousConfig, v1.WithBossConfig(c.c, image))
+	return container.Update(ctx, config.WithSetPreviousConfig, config.WithBossConfig(c.c, image))
 }
 
 type filesChange struct {

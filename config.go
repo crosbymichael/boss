@@ -1,8 +1,6 @@
 package main
 
-import (
-	"github.com/box/box/config/v1"
-)
+import "github.com/crosbymichael/boss/api/v1"
 
 type Container struct {
 	ID        string             `toml:"id"`

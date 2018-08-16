@@ -33,7 +33,7 @@ var updateCommand = cli.Command{
 			path = clix.Args().First()
 			ctx  = system.Context()
 		)
-		var newConfig config.Container
+		var newConfig Container
 		if _, err := toml.DecodeFile(path, &newConfig); err != nil {
 			return err
 		}
@@ -53,15 +53,15 @@ var updateCommand = cli.Command{
 			return err
 		}
 
-		c, err := system.Load()
+		c, err := config.Load()
 		if err != nil {
 			return err
 		}
-		register, err := system.GetRegister(c)
+		register, err := c.GetRegister()
 		if err != nil {
 			return err
 		}
-		store, err := system.GetConfigStore(c)
+		store, err := c.Store()
 		if err != nil {
 			return err
 		}
@@ -92,10 +92,10 @@ var updateCommand = cli.Command{
 		})
 		changes = append(changes, &configChange{
 			client: client,
-			c:      &newConfig,
+			c:      newConfig.Proto(),
 		})
 		changes = append(changes, &filesChange{
-			c:     &newConfig,
+			c:     newConfig.Proto(),
 			store: store,
 		})
 		return pauseAndRun(ctx, container, func() error {

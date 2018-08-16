@@ -11,6 +11,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/typeurl"
+	"github.com/crosbymichael/boss/api/v1"
 	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/system"
 	units "github.com/docker/go-units"
@@ -85,7 +86,7 @@ var listCommand = cli.Command{
 				c.ID(),
 				info.Image,
 				status.Status,
-				info.Labels[config.IPLabel],
+				info.Labels[v1.IPLabel],
 				cpu,
 				fmt.Sprintf("%s/%s", memory, limit),
 				fmt.Sprintf("%d/%d", cg.Pids.Current, cg.Pids.Limit),
@@ -96,7 +97,7 @@ var listCommand = cli.Command{
 	},
 }
 
-func getBindSizes(c *config.Container) (size int64, _ error) {
+func getBindSizes(c *v1.Container) (size int64, _ error) {
 	for _, m := range c.Mounts {
 		f, err := os.Open(m.Source)
 		if err != nil {

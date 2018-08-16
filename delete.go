@@ -29,11 +29,11 @@ var deleteCommand = cli.Command{
 		if err := systemd.Disable(ctx, id); err != nil {
 			return err
 		}
-		c, err := system.Load()
+		c, err := config.Load()
 		if err != nil {
 			return err
 		}
-		register, err := system.GetRegister(c)
+		register, err := c.GetRegister()
 		if err != nil {
 			return err
 		}
@@ -41,7 +41,7 @@ var deleteCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		network, err := system.GetNetwork(c, config.Network)
+		network, err := c.GetNetwork(config.Network)
 		if err != nil {
 			return err
 		}

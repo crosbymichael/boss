@@ -15,6 +15,7 @@ import (
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/crosbymichael/boss/api/v1"
 	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/system"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -44,7 +45,7 @@ var systemdExecStartPreCommand = cli.Command{
 	Usage: "exec-start-pre proxy for containers",
 	Action: func(clix *cli.Context) error {
 		id := clix.Args().First()
-		c, err := system.Load()
+		c, err := config.Load()
 		if err != nil {
 			return err
 		}
@@ -65,7 +66,7 @@ var systemdExecStartPostCommand = cli.Command{
 		id := clix.Args().First()
 		err := cleanupPreviousTask(id)
 		ctx := system.Context()
-		c, err := system.Load()
+		c, err := config.Load()
 		if err != nil {
 			return err
 		}
@@ -82,7 +83,7 @@ var systemdExecStartPostCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		register, err := system.GetRegister(c)
+		register, err := c.GetRegister()
 		if err != nil {
 			return err
 		}
@@ -112,34 +113,34 @@ var systemdExecStartCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		config, err := config.GetConfig(ctx, container)
+		cfg, err := config.GetConfig(ctx, container)
 		if err != nil {
 			return err
 		}
-		c, err := system.Load()
+		c, err := config.Load()
 		if err != nil {
 			return err
 		}
-		register, err := system.GetRegister(c)
+		register, err := c.GetRegister()
 		if err != nil {
 			return err
 		}
-		store, err := system.GetConfigStore(c)
+		store, err := c.Store()
 		if err != nil {
 			return err
 		}
-		templateCh, err := store.Watch(ctx, container, config)
+		templateCh, err := store.Watch(ctx, container, cfg)
 		if err != nil {
 			return err
 		}
-		if err := setupNetworking(ctx, container, config); err != nil {
+		if err := setupNetworking(ctx, container, cfg); err != nil {
 			return err
 		}
 		task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStdio))
 		if err != nil {
 			return err
 		}
-		status, err := monitorTask(ctx, client, task, config, register, signals, templateCh)
+		status, err := monitorTask(ctx, client, task, cfg, register, signals, templateCh)
 		if err != nil {
 			return err
 		}
@@ -148,7 +149,7 @@ var systemdExecStartCommand = cli.Command{
 	},
 }
 
-func monitorTask(ctx context.Context, client *containerd.Client, task containerd.Task, config *config.Container, register config.Register, signals chan os.Signal, templateCh <-chan error) (int, error) {
+func monitorTask(ctx context.Context, client *containerd.Client, task containerd.Task, config *v1.Container, register v1.Register, signals chan os.Signal, templateCh <-chan error) (int, error) {
 	defer task.Delete(ctx, containerd.WithProcessKill)
 	started := make(chan error, 1)
 	wait, err := task.Wait(ctx)
@@ -223,16 +224,16 @@ func isUnavailable(err error) bool {
 	return errdefs.IsUnavailable(errdefs.FromGRPC(err))
 }
 
-func setupNetworking(ctx context.Context, container containerd.Container, c *config.Container) error {
-	cfg, err := system.Load()
+func setupNetworking(ctx context.Context, container containerd.Container, c *v1.Container) error {
+	cfg, err := config.Load()
 	if err != nil {
 		return err
 	}
-	network, err := system.GetNetwork(cfg, c.Network)
+	network, err := cfg.GetNetwork(c.Network)
 	if err != nil {
 		return err
 	}
-	register, err := system.GetRegister(cfg)
+	register, err := cfg.GetRegister()
 	if err != nil {
 		return err
 	}
@@ -241,7 +242,7 @@ func setupNetworking(ctx context.Context, container containerd.Container, c *con
 		return err
 	}
 	if ip != "" {
-		if err := container.Update(ctx, config.WithIP(ip)); err != nil {
+		if err := container.Update(ctx, v1.WithIP(ip)); err != nil {
 			return err
 		}
 		logrus.WithField("id", container.ID()).WithField("ip", ip).Info("setup network interface")
@@ -264,11 +265,11 @@ func systemdPreSetup(clix *cli.Context) error {
 }
 
 func setupResolvConf(id string, c *config.Config) error {
-	servers, err := system.GetNameservers(c)
+	servers, err := c.GetNameservers()
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Join(config.Root, id), 0711); err != nil {
+	if err := os.MkdirAll(filepath.Join(v1.Root, id), 0711); err != nil {
 		return err
 	}
 	f, err := ioutil.TempFile("", "boss-resolvconf")
@@ -285,7 +286,7 @@ func setupResolvConf(id string, c *config.Config) error {
 		}
 	}
 	f.Close()
-	return os.Rename(f.Name(), filepath.Join(config.Root, id, "resolv.conf"))
+	return os.Rename(f.Name(), filepath.Join(v1.Root, id, "resolv.conf"))
 }
 
 func setupApparmor() error {

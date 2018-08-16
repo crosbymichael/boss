@@ -15,7 +15,7 @@ var killCommand = cli.Command{
 			id  = clix.Args().First()
 			ctx = system.Context()
 		)
-		c, err := system.Load()
+		c, err := config.Load()
 		if err != nil {
 			return err
 		}
@@ -32,7 +32,7 @@ var killCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		register, err := system.GetRegister(c)
+		register, err := c.GetRegister()
 		if err != nil {
 			return err
 		}

@@ -30,7 +30,7 @@ var initCommand = cli.Command{
 		},
 	},
 	Action: func(clix *cli.Context) error {
-		c, err := system.Load()
+		c, err := config.Load()
 		if err != nil {
 			return err
 		}
