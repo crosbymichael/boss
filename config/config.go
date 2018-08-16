@@ -40,6 +40,7 @@ type Config struct {
 	NodeExporter *NodeExporter `toml:"node_exporter"`
 	Nameservers  []string      `toml:"nameservers"`
 	Timezone     string        `toml:"timezone"`
+	MOTD         *MOTD         `toml:"motd"`
 }
 
 func (c *Config) Steps() []Step {
@@ -81,6 +82,9 @@ func (c *Config) Steps() []Step {
 	if c.CNI != nil {
 		steps = append(steps, c.CNI)
 		steps = append(steps, c.CNI.SubSteps()...)
+	}
+	if c.MOTD != nil {
+		steps = append(steps, c.MOTD)
 	}
 	if c.consul() {
 		// add DNS at the end so we can still pull images in the other steps
