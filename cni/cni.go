@@ -16,9 +16,9 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func New(t, iface string, n networking.CNI) (v1.Network, error) {
+func New(t, iface, mvlanAddress string, n networking.CNI) (v1.Network, error) {
 	if t == "macvlan" {
-		if err := route.Create(iface); err != nil {
+		if err := route.Create(iface, mvlanAddress); err != nil {
 			return nil, err
 		}
 	}

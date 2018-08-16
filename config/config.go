@@ -112,6 +112,9 @@ func (c *Config) GetNetwork(name string) (v1.Network, error) {
 		if c.CNI == nil {
 			return nil, errors.New("[cni] is not enabled in the system config")
 		}
+		if c.CNI.Type == "macvlan" && c.CNI.BridgeAddress == "" {
+			return nil, errors.New("bridge_address must be specified with macvlan")
+		}
 		// populate cni data from main config if fields are missing
 		c.CNI.Version = "0.3.1"
 		if c.CNI.NetworkName == "" {
@@ -124,7 +127,7 @@ func (c *Config) GetNetwork(name string) (v1.Network, error) {
 		if err != nil {
 			return nil, err
 		}
-		return cni.New(c.CNI.Type, c.Iface, n)
+		return cni.New(c.CNI.Type, c.Iface, c.CNI.BridgeAddress, n)
 	}
 	return nil, errors.Errorf("network %s does not exist", name)
 }

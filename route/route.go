@@ -3,15 +3,13 @@ package route
 import (
 	"net"
 	"os/exec"
-	"strings"
 
-	"github.com/crosbymichael/boss/util"
 	"github.com/pkg/errors"
 )
 
 const Interface = "mvlan0"
 
-func Create(iface string) (err error) {
+func Create(iface, address string) (err error) {
 	// don't create if it already exists
 	if _, err := net.InterfaceByName(Interface); err == nil {
 		return nil
@@ -21,14 +19,6 @@ func Create(iface string) (err error) {
 			ip("link", "del", Interface)
 		}
 	}()
-	address, err := util.GetIP(iface)
-	if err != nil {
-		return err
-	}
-	parts := strings.Split(address, ".")
-	last := len(parts) - 1
-	parts[last] = "0"
-	address = strings.Join(parts, ".")
 	if err := ip("link", "add", "link", iface, Interface, "type", "macvlan", "mode", "bridge"); err != nil {
 		return err
 	}
