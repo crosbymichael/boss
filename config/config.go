@@ -80,6 +80,7 @@ type Config struct {
 	Timezone     string        `toml:"timezone"`
 	MOTD         *MOTD         `toml:"motd"`
 	SSH          *SSH          `toml:"ssh"`
+	Agent        Agent         `toml:"agent"`
 }
 
 func (c *Config) Store() (ConfigStore, error) {
@@ -168,12 +169,21 @@ func (c *Config) Steps() []Step {
 		&Mkdir{},
 		&Systemd{},
 		&Timezone{TZ: c.Timezone},
+		&c.Agent,
 	}
 	if c.consul() {
 		// set the config for other things
 		c.Consul.c = c
 		steps = append(steps, c.Consul)
 		steps = append(steps, c.Consul.SubSteps()...)
+		steps = append(steps, &RegisterService{
+			Config: c,
+			ID:     "agent",
+			Tags: []string{
+				"boss",
+			},
+			Port: 1337,
+		})
 	}
 	if c.NodeExporter != nil {
 		steps = append(steps, c.NodeExporter)
