@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd"
+	"github.com/crosbymichael/boss/api/v1"
 	"github.com/crosbymichael/boss/util"
 	"github.com/hashicorp/consul/api"
 	"github.com/urfave/cli"
@@ -15,6 +16,7 @@ type RegisterService struct {
 	Port   int
 	Tags   []string
 	Config *Config
+	Check  *v1.HealthCheck
 }
 
 func (s *RegisterService) Name() string {
@@ -36,6 +38,29 @@ func (s *RegisterService) Run(ctx context.Context, client *containerd.Client, cl
 		Tags:    s.Tags,
 		Port:    s.Port,
 		Address: ip,
+	}
+	if s.Check != nil {
+		var check api.AgentServiceCheck
+		check.Name = s.ID
+		if s.Check.Interval == 0 {
+			s.Check.Interval = 10
+		}
+		check.Interval = fmt.Sprintf("%ds", s.Check.Interval)
+		if s.Check.Timeout != 0 {
+			check.Timeout = fmt.Sprintf("%ds", s.Check.Timeout)
+		}
+		addr := fmt.Sprintf("%s:%d", ip, s.Port)
+		switch s.Check.Type {
+		case "http":
+			url := ""
+			check.HTTP = fmt.Sprintf("http://%s%s", addr, url)
+			check.Method = s.Check.Method
+		case "tcp":
+			check.TCP = addr
+		case "grpc":
+			check.GRPC = addr
+		}
+		reg.Checks = append(reg.Checks, &check)
 	}
 	return consul.Agent().ServiceRegister(reg)
 }

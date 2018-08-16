@@ -187,6 +187,9 @@ func (c *Config) Steps() []Step {
 				"boss",
 			},
 			Port: 1337,
+			Check: &v1.HealthCheck{
+				Type: "grpc",
+			},
 		})
 	}
 	if c.NodeExporter != nil {
