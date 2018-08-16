@@ -106,6 +106,10 @@ func (a *Agent) Delete(ctx context.Context, req *v1.DeleteRequest) (*types.Empty
 }
 
 func (a *Agent) Get(ctx context.Context, req *v1.GetRequest) (*v1.GetResponse, error) {
+	id := req.ID
+	if id == "" {
+		return nil, ErrNoID
+	}
 	container, err := a.client.LoadContainer(ctx, req.ID)
 	if err != nil {
 		return nil, err
@@ -204,6 +208,9 @@ func (a *Agent) List(ctx context.Context, req *v1.ListRequest) (*v1.ListResponse
 
 func (a *Agent) Kill(ctx context.Context, req *v1.KillRequest) (*types.Empty, error) {
 	id := req.ID
+	if id == "" {
+		return nil, ErrNoID
+	}
 	container, err := a.client.LoadContainer(ctx, id)
 	if err != nil {
 		return nil, err
@@ -228,10 +235,18 @@ func (a *Agent) Kill(ctx context.Context, req *v1.KillRequest) (*types.Empty, er
 }
 
 func (a *Agent) Start(ctx context.Context, req *v1.StartRequest) (*types.Empty, error) {
+	id := req.ID
+	if id == "" {
+		return nil, ErrNoID
+	}
 	return empty, systemd.Start(ctx, req.ID)
 }
 
 func (a *Agent) Stop(ctx context.Context, req *v1.StopRequest) (*types.Empty, error) {
+	id := req.ID
+	if id == "" {
+		return nil, ErrNoID
+	}
 	return empty, systemd.Stop(ctx, req.ID)
 }
 

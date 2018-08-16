@@ -2,18 +2,38 @@ package hcs
 
 import (
 	"encoding/json"
+	"os"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/Microsoft/hcsshim/internal/interop"
 	"github.com/Microsoft/hcsshim/internal/schema1"
+	"github.com/Microsoft/hcsshim/internal/timeout"
 	"github.com/sirupsen/logrus"
 )
 
-var (
-	defaultTimeout = time.Minute * 4
-)
+// currentContainerStarts is used to limit the number of concurrent container
+// starts.
+var currentContainerStarts containerStarts
+
+type containerStarts struct {
+	maxParallel int
+	inProgress  int
+	sync.Mutex
+}
+
+func init() {
+	mpsS := os.Getenv("HCSSHIM_MAX_PARALLEL_START")
+	if len(mpsS) > 0 {
+		mpsI, err := strconv.Atoi(mpsS)
+		if err != nil || mpsI < 0 {
+			return
+		}
+		currentContainerStarts.maxParallel = mpsI
+	}
+}
 
 type System struct {
 	handleLock     sync.RWMutex
@@ -54,7 +74,7 @@ func CreateComputeSystem(id string, hcsDocumentInterface interface{}) (*System, 
 		}
 	}
 
-	events, err := processAsyncHcsResult(createError, resultp, computeSystem.callbackNumber, hcsNotificationSystemCreateCompleted, &defaultTimeout)
+	events, err := processAsyncHcsResult(createError, resultp, computeSystem.callbackNumber, hcsNotificationSystemCreateCompleted, &timeout.Duration)
 	if err != nil {
 		if err == ErrTimeout {
 			// Terminate the compute system if it still exists. We're okay to
@@ -145,9 +165,35 @@ func (computeSystem *System) Start() error {
 		return makeSystemError(computeSystem, "Start", "", ErrAlreadyClosed, nil)
 	}
 
+	// This is a very simple backoff-retry loop to limit the number
+	// of parallel container starts if environment variable
+	// HCSSHIM_MAX_PARALLEL_START is set to a positive integer.
+	// It should generally only be used as a workaround to various
+	// platform issues that exist between RS1 and RS4 as of Aug 2018
+	if currentContainerStarts.maxParallel > 0 {
+		for {
+			currentContainerStarts.Lock()
+			if currentContainerStarts.inProgress < currentContainerStarts.maxParallel {
+				currentContainerStarts.inProgress++
+				currentContainerStarts.Unlock()
+				break
+			}
+			if currentContainerStarts.inProgress == currentContainerStarts.maxParallel {
+				currentContainerStarts.Unlock()
+				time.Sleep(100 * time.Millisecond)
+			}
+		}
+		// Make sure we decrement the count when we are done.
+		defer func() {
+			currentContainerStarts.Lock()
+			currentContainerStarts.inProgress--
+			currentContainerStarts.Unlock()
+		}()
+	}
+
 	var resultp *uint16
 	err := hcsStartComputeSystem(computeSystem.handle, "", &resultp)
-	events, err := processAsyncHcsResult(err, resultp, computeSystem.callbackNumber, hcsNotificationSystemStartCompleted, &defaultTimeout)
+	events, err := processAsyncHcsResult(err, resultp, computeSystem.callbackNumber, hcsNotificationSystemStartCompleted, &timeout.Duration)
 	if err != nil {
 		return makeSystemError(computeSystem, "Start", "", err, events)
 	}
@@ -275,7 +321,7 @@ func (computeSystem *System) Pause() error {
 
 	var resultp *uint16
 	err := hcsPauseComputeSystem(computeSystem.handle, "", &resultp)
-	events, err := processAsyncHcsResult(err, resultp, computeSystem.callbackNumber, hcsNotificationSystemPauseCompleted, &defaultTimeout)
+	events, err := processAsyncHcsResult(err, resultp, computeSystem.callbackNumber, hcsNotificationSystemPauseCompleted, &timeout.Duration)
 	if err != nil {
 		return makeSystemError(computeSystem, "Pause", "", err, events)
 	}
@@ -297,7 +343,7 @@ func (computeSystem *System) Resume() error {
 
 	var resultp *uint16
 	err := hcsResumeComputeSystem(computeSystem.handle, "", &resultp)
-	events, err := processAsyncHcsResult(err, resultp, computeSystem.callbackNumber, hcsNotificationSystemResumeCompleted, &defaultTimeout)
+	events, err := processAsyncHcsResult(err, resultp, computeSystem.callbackNumber, hcsNotificationSystemResumeCompleted, &timeout.Duration)
 	if err != nil {
 		return makeSystemError(computeSystem, "Resume", "", err, events)
 	}
