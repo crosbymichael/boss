@@ -41,6 +41,7 @@ type Config struct {
 	Nameservers  []string      `toml:"nameservers"`
 	Timezone     string        `toml:"timezone"`
 	MOTD         *MOTD         `toml:"motd"`
+	SSH          *SSH          `toml:"ssh"`
 }
 
 func (c *Config) Steps() []Step {
@@ -86,6 +87,9 @@ func (c *Config) Steps() []Step {
 	if c.MOTD != nil {
 		steps = append(steps, c.MOTD)
 	}
+	if c.SSH != nil {
+		steps = append(steps, c.SSH)
+	}
 	if c.consul() {
 		// add DNS at the end so we can still pull images in the other steps
 		steps = append(steps, &DNS{
@@ -97,9 +101,4 @@ func (c *Config) Steps() []Step {
 
 func (c *Config) consul() bool {
 	return c.Consul != nil
-}
-
-type SSH struct {
-	Admin          string `toml:"admin"`
-	AuthorizedKeys string `toml:"authorized_keys"`
 }
