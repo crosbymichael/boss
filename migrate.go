@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
@@ -35,6 +36,7 @@ var migrateCommand = cli.Command{
 			if _, err := config.GetConfig(ctx, c); err == nil {
 				continue
 			}
+			fmt.Println("migrating", c.ID())
 			current, err := loadOldConfig(ctx, c)
 			if err != nil {
 				return err
