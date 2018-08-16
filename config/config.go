@@ -455,10 +455,16 @@ func GetConfig(ctx context.Context, container containerd.Container) (*v1.Contain
 	return UnmarshalConfig(&d)
 }
 
+var ErrOldConfigFormat = errors.New("old config format on container")
+
 func UnmarshalConfig(any *types.Any) (*v1.Container, error) {
 	v, err := typeurl.UnmarshalAny(any)
 	if err != nil {
 		return nil, err
 	}
-	return v.(*v1.Container), nil
+	c, ok := v.(*v1.Container)
+	if !ok {
+		return nil, ErrOldConfigFormat
+	}
+	return c, nil
 }

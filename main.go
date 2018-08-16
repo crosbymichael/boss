@@ -57,6 +57,7 @@ run containers like a boss`
 		initCommand,
 		killCommand,
 		listCommand,
+		migrateCommand,
 		networkCommand,
 		rollbackCommand,
 		startCommand,
