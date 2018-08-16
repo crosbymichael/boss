@@ -1,10 +1,8 @@
 package main
 
 import (
-	"github.com/crosbymichael/boss/config"
-	"github.com/crosbymichael/boss/system"
+	"github.com/crosbymichael/boss/api/v1"
 	"github.com/urfave/cli"
-	"golang.org/x/sys/unix"
 )
 
 var killCommand = cli.Command{
@@ -13,50 +11,17 @@ var killCommand = cli.Command{
 	Action: func(clix *cli.Context) error {
 		var (
 			id  = clix.Args().First()
-			ctx = system.Context()
+			ctx = Context()
 		)
-		c, err := config.Load()
-		if err != nil {
-			return err
-		}
-		client, err := system.NewClient()
-		if err != nil {
-			return err
-		}
-		defer client.Close()
-		container, err := client.LoadContainer(ctx, id)
-		if err != nil {
-			return err
-		}
-		config, err := config.GetConfig(ctx, container)
-		if err != nil {
-			return err
-		}
-		register, err := c.GetRegister()
-		if err != nil {
-			return err
-		}
-		for name := range config.Services {
-			if err := register.EnableMaintainance(id, name, "manual kill"); err != nil {
-				return err
-			}
-		}
-		task, err := container.Task(ctx, nil)
-		if err != nil {
-			return err
-		}
-		wait, err := task.Wait(ctx)
-		if err != nil {
-			return err
-		}
-		if err := task.Kill(ctx, unix.SIGTERM); err != nil {
-			return err
-		}
-		<-wait
 
-		if _, err := task.Delete(ctx); err != nil {
+		agent, err := Agent(clix)
+		if err != nil {
 			return err
 		}
-		return nil
+		defer agent.Close()
+		_, err = agent.Kill(ctx, &v1.KillRequest{
+			ID: id,
+		})
+		return err
 	},
 }

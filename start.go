@@ -1,8 +1,7 @@
 package main
 
 import (
-	"github.com/crosbymichael/boss/system"
-	"github.com/crosbymichael/boss/systemd"
+	"github.com/crosbymichael/boss/api/v1"
 	"github.com/urfave/cli"
 )
 
@@ -12,9 +11,16 @@ var startCommand = cli.Command{
 	Action: func(clix *cli.Context) error {
 		var (
 			id  = clix.Args().First()
-			ctx = system.Context()
+			ctx = Context()
 		)
-		// FIXME: verify that we acutally have a container with provided id
-		return systemd.Start(ctx, id)
+		agent, err := Agent(clix)
+		if err != nil {
+			return err
+		}
+		defer agent.Close()
+		_, err = agent.Start(ctx, &v1.StartRequest{
+			ID: id,
+		})
+		return err
 	},
 }

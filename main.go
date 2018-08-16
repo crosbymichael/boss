@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/containerd/containerd/namespaces"
+	"github.com/crosbymichael/boss/api/v1"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
@@ -69,5 +71,5 @@ run containers like a boss`
 }
 
 func Context() context.Context {
-	return context.Background()
+	return namespaces.WithNamespace(context.Background(), v1.DefaultNamespace)
 }

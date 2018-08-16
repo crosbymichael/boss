@@ -1,8 +1,7 @@
 package main
 
 import (
-	"github.com/crosbymichael/boss/system"
-	"github.com/crosbymichael/boss/systemd"
+	"github.com/crosbymichael/boss/api/v1"
 	"github.com/urfave/cli"
 )
 
@@ -12,8 +11,16 @@ var stopCommand = cli.Command{
 	Action: func(clix *cli.Context) error {
 		var (
 			id  = clix.Args().First()
-			ctx = system.Context()
+			ctx = Context()
 		)
-		return systemd.Stop(ctx, id)
+		agent, err := Agent(clix)
+		if err != nil {
+			return err
+		}
+		defer agent.Close()
+		_, err = agent.Stop(ctx, &v1.StopRequest{
+			ID: id,
+		})
+		return err
 	},
 }

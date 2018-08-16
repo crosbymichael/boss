@@ -1,8 +1,7 @@
-package main
+package agent
 
 import (
 	"context"
-	"os"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
@@ -10,8 +9,6 @@ import (
 	"github.com/crosbymichael/boss/api/v1"
 	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/flux"
-	"github.com/crosbymichael/boss/image"
-	"github.com/urfave/cli"
 )
 
 type change interface {
@@ -20,12 +17,11 @@ type change interface {
 
 type imageUpdateChange struct {
 	ref    string
-	clix   *cli.Context
 	client *containerd.Client
 }
 
 func (c *imageUpdateChange) update(ctx context.Context, container containerd.Container) error {
-	image, err := image.Get(ctx, c.client, c.ref, c.clix, os.Stdout, true)
+	image, err := c.client.Pull(ctx, c.ref, containerd.WithPullUnpack)
 	if err != nil {
 		return err
 	}

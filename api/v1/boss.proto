@@ -45,7 +45,20 @@ message ListRequest {
 }
 
 message ListResponse {
-	repeated Container containers = 1;
+	repeated ListContainer containers = 1;
+}
+
+message ListContainer {
+	string id = 1 [(gogoproto.customname) = "ID"];;
+	string image = 2;
+	string status = 3;
+	string ip = 4 [(gogoproto.customname) = "IP"];;
+	uint64 cpu = 5;
+	double memory_usage = 6;
+	double memory_limit = 7;
+	uint64 pid_usage = 8;
+	uint64 pid_limit = 9;
+	int64 fs_size = 10;
 }
 
 message RollbackRequest {

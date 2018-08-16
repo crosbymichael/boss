@@ -15,6 +15,7 @@ var deleteCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+		defer agent.Close()
 		_, err = agent.Delete(ctx, &v1.DeleteRequest{
 			ID: id,
 		})

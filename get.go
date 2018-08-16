@@ -1,11 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 
-	"github.com/BurntSushi/toml"
-	"github.com/crosbymichael/boss/config"
-	"github.com/crosbymichael/boss/system"
+	"github.com/crosbymichael/boss/api/v1"
 	"github.com/urfave/cli"
 )
 
@@ -15,21 +14,19 @@ var getCommand = cli.Command{
 	Action: func(clix *cli.Context) error {
 		var (
 			id  = clix.Args().First()
-			ctx = system.Context()
+			ctx = Context()
 		)
-		client, err := system.NewClient()
+		agent, err := Agent(clix)
 		if err != nil {
 			return err
 		}
-		defer client.Close()
-		container, err := client.LoadContainer(ctx, id)
+		defer agent.Close()
+		r, err := agent.Get(ctx, &v1.GetRequest{
+			ID: id,
+		})
 		if err != nil {
 			return err
 		}
-		config, err := config.GetConfig(ctx, container)
-		if err != nil {
-			return err
-		}
-		return toml.NewEncoder(os.Stdout).Encode(config)
+		return json.NewEncoder(os.Stdout).Encode(r.Container)
 	},
 }
