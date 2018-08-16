@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package io.boss.v1;
+
+import weak "gogoproto/gogo.proto";
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/crosbymichael/boss/api/v1;v1";
+
+service Agent {
+}
