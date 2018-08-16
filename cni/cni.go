@@ -10,15 +10,15 @@ import (
 
 	"github.com/containerd/containerd"
 	networking "github.com/containerd/go-cni"
-	"github.com/crosbymichael/boss/config"
+	"github.com/crosbymichael/boss/api/v1"
 	"github.com/crosbymichael/boss/route"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
 
-func New(t, iface string, n networking.CNI) (config.Network, error) {
+func New(t, iface, mvlanAddress string, n networking.CNI) (v1.Network, error) {
 	if t == "macvlan" {
-		if err := route.Create(iface); err != nil {
+		if err := route.Create(iface, mvlanAddress); err != nil {
 			return nil, err
 		}
 	}
@@ -34,7 +34,7 @@ type cni struct {
 }
 
 func (n *cni) Create(ctx context.Context, task containerd.Container) (string, error) {
-	path := config.NetworkPath(task.ID())
+	path := v1.NetworkPath(task.ID())
 	if _, err := os.Lstat(path); err != nil {
 		if !os.IsNotExist(err) {
 			return "", err
@@ -56,7 +56,7 @@ func (n *cni) Create(ctx context.Context, task containerd.Container) (string, er
 				break
 			}
 		}
-		if err := task.Update(ctx, config.WithIP(ip.String())); err != nil {
+		if err := task.Update(ctx, v1.WithIP(ip.String())); err != nil {
 			return "", err
 		}
 		if n.nt == "macvlan" {
@@ -71,11 +71,11 @@ func (n *cni) Create(ctx context.Context, task containerd.Container) (string, er
 	if err != nil {
 		return "", err
 	}
-	return l[config.IPLabel], nil
+	return l[v1.IPLabel], nil
 }
 
 func (n *cni) Remove(ctx context.Context, c containerd.Container) error {
-	path := config.NetworkPath(c.ID())
+	path := v1.NetworkPath(c.ID())
 	if err := n.network.Remove(c.ID(), path); err != nil {
 		return err
 	}
@@ -87,7 +87,7 @@ func (n *cni) Remove(ctx context.Context, c containerd.Container) error {
 		if err != nil {
 			return err
 		}
-		ip := info.Labels[config.IPLabel]
+		ip := info.Labels[v1.IPLabel]
 		if ip != "" {
 			if err := route.Remove(ip); err != nil {
 				return err

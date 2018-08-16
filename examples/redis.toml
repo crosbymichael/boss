@@ -1,3 +1,12 @@
 id = "redis"
 image = "docker.io/library/redis:3.2-alpine"
-network = "host"
+network = "cni"
+
+[resources]
+	cpu = 1.0
+	memory = 64
+
+[services]
+	[services.redis]
+		port = 6379
+		labels = ["dev"]

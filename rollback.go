@@ -1,11 +1,8 @@
 package main
 
 import (
-	"github.com/crosbymichael/boss/config"
-	"github.com/crosbymichael/boss/flux"
-	"github.com/crosbymichael/boss/system"
+	"github.com/crosbymichael/boss/api/v1"
 	"github.com/urfave/cli"
-	"golang.org/x/sys/unix"
 )
 
 var rollbackCommand = cli.Command{
@@ -14,31 +11,16 @@ var rollbackCommand = cli.Command{
 	Action: func(clix *cli.Context) error {
 		var (
 			id  = clix.Args().First()
-			ctx = system.Context()
+			ctx = Context()
 		)
-		client, err := system.NewClient()
+		agent, err := Agent(clix)
 		if err != nil {
 			return err
 		}
-		defer client.Close()
-		ctx, done, err := client.WithLease(ctx)
-		if err != nil {
-			return err
-		}
-		defer done(ctx)
-		container, err := client.LoadContainer(ctx, id)
-		if err != nil {
-			return err
-		}
-		return pauseAndRun(ctx, container, func() error {
-			if err := container.Update(ctx, flux.WithRollback, config.WithRollback); err != nil {
-				return err
-			}
-			task, err := container.Task(ctx, nil)
-			if err != nil {
-				return err
-			}
-			return task.Kill(ctx, unix.SIGTERM)
+		defer agent.Close()
+		_, err = agent.Rollback(ctx, &v1.RollbackRequest{
+			ID: id,
 		})
+		return err
 	},
 }

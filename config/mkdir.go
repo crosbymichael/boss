@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/containerd/containerd"
+	"github.com/crosbymichael/boss/api/v1"
 	"github.com/urfave/cli"
 )
 
@@ -16,9 +17,9 @@ func (s *Mkdir) Name() string {
 }
 
 func (s *Mkdir) Run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
-	return os.MkdirAll(Root, 0711)
+	return os.MkdirAll(v1.Root, 0711)
 }
 
 func (s *Mkdir) Remove(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
-	return os.RemoveAll(Root)
+	return os.RemoveAll(v1.Root)
 }

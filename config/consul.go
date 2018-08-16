@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"text/template"
+	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/crosbymichael/boss/util"
@@ -88,7 +89,11 @@ func (s *Consul) Run(ctx context.Context, client *containerd.Client, clix *cli.C
 	}
 	err = t.Execute(f, tmplCtx)
 	f.Close()
-	return startNewService(ctx, name)
+	if err := startNewService(ctx, name); err != nil {
+		return err
+	}
+	time.Sleep(5 * time.Second)
+	return nil
 }
 
 func (s *Consul) Remove(ctx context.Context, client *containerd.Client, clix *cli.Context) error {

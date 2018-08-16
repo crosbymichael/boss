@@ -9,12 +9,13 @@ import (
 )
 
 type CNI struct {
-	Image       string `toml:"image" json:"-"`
-	Version     string `toml:"-" json:"cniVersion,omitempty"`
-	NetworkName string `toml:"name" json:"name"`
-	Type        string `toml:"type" json:"type"`
-	Master      string `toml:"master" json:"master,omitempty"`
-	IPAM        IPAM   `toml:"ipam" json:"ipam"`
+	Image         string `toml:"image" json:"-"`
+	Version       string `toml:"-" json:"cniVersion,omitempty"`
+	NetworkName   string `toml:"name" json:"name"`
+	Type          string `toml:"type" json:"type"`
+	Master        string `toml:"master" json:"master,omitempty"`
+	IPAM          IPAM   `toml:"ipam" json:"ipam"`
+	BridgeAddress string `toml:"bridge_address" json:"-"`
 }
 
 func (c *CNI) SubSteps() (o []Step) {

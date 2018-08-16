@@ -61,7 +61,7 @@ func startNewService(ctx context.Context, name string) error {
 			if err := systemd.Command(ctx, "status", name); err == nil {
 				return nil
 			}
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(1 * time.Second)
 		}
 	}
 }

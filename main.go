@@ -1,16 +1,20 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
+	"github.com/containerd/containerd/namespaces"
+	"github.com/crosbymichael/boss/api/v1"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
 func main() {
 	app := cli.NewApp()
 	app.Name = "boss"
-	app.Version = "11-dev"
+	app.Version = "12-dev"
 	app.Usage = "run containers like a ross"
 	app.Description = `
 
@@ -27,7 +31,25 @@ func main() {
      \/__/         \/__/         \/__/         \/__/    
 
 run containers like a boss`
+	app.Flags = []cli.Flag{
+		cli.BoolFlag{
+			Name:  "debug",
+			Usage: "enable debug output in the logs",
+		},
+		cli.StringFlag{
+			Name:  "agent",
+			Usage: "agent address",
+			Value: "0.0.0.0:1337",
+		},
+	}
+	app.Before = func(clix *cli.Context) error {
+		if clix.GlobalBool("debug") {
+			logrus.SetLevel(logrus.DebugLevel)
+		}
+		return nil
+	}
 	app.Commands = []cli.Command{
+		agentCommand,
 		buildCommand,
 		createCommand,
 		deleteCommand,
@@ -46,4 +68,8 @@ run containers like a boss`
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func Context() context.Context {
+	return namespaces.WithNamespace(context.Background(), v1.DefaultNamespace)
 }

@@ -187,7 +187,7 @@ func build(clicontext *cli.Context) error {
 			c = cf
 		}
 		// not using shared context to not disrupt display but let is finish reporting errors
-		return progressui.DisplaySolveStatus(context.TODO(), c, os.Stdout, displayCh)
+		return progressui.DisplaySolveStatus(context.TODO(), "", c, os.Stdout, displayCh)
 	})
 
 	return eg.Wait()

@@ -1,73 +1,48 @@
 package main
 
 import (
-	"os"
-
 	"github.com/BurntSushi/toml"
-	"github.com/containerd/containerd/platforms"
-	"github.com/crosbymichael/boss/config"
-	"github.com/crosbymichael/boss/flux"
-	"github.com/crosbymichael/boss/image"
-	"github.com/crosbymichael/boss/system"
-	"github.com/crosbymichael/boss/systemd"
+	"github.com/crosbymichael/boss/api/v1"
 	"github.com/urfave/cli"
+	"google.golang.org/grpc"
 )
 
 var createCommand = cli.Command{
 	Name:  "create",
 	Usage: "create a container",
-	Flags: []cli.Flag{
-		cli.StringSliceFlag{
-			Name:  "platform",
-			Usage: "pull content from a specific platform",
-			Value: &cli.StringSlice{platforms.Default()},
-		},
-		cli.BoolFlag{
-			Name:  "all-platforms",
-			Usage: "pull content from all platforms",
-		},
-		cli.BoolFlag{
-			Name:  "plain-http",
-			Usage: "don't fetch with https",
-		},
-	},
 	Action: func(clix *cli.Context) error {
-		var container config.Container
+		var container Container
 		if _, err := toml.DecodeFile(clix.Args().First(), &container); err != nil {
 			return err
 		}
-		ctx := system.Context()
-		c, err := system.Load()
+		agent, err := Agent(clix)
 		if err != nil {
 			return err
 		}
-		client, err := system.NewClient()
-		if err != nil {
-			return err
-		}
-		defer client.Close()
-		image, err := image.Get(ctx, client, container.Image, clix, os.Stdout, true)
-		if err != nil {
-			return err
-		}
-		store, err := system.GetConfigStore(c)
-		if err != nil {
-			return err
-		}
-		if err := store.Write(ctx, &container); err != nil {
-			return err
-		}
-		if _, err := client.NewContainer(
-			ctx,
-			container.ID,
-			flux.WithNewSnapshot(image),
-			config.WithBossConfig(&container, image),
-		); err != nil {
-			return err
-		}
-		if err := systemd.Enable(ctx, container.ID); err != nil {
-			return err
-		}
-		return systemd.Start(ctx, container.ID)
+		defer agent.Close()
+		_, err = agent.Create(Context(), &v1.CreateRequest{
+			Container: container.Proto(),
+		})
+		return err
 	},
+}
+
+type LocalAgent struct {
+	v1.AgentClient
+	conn *grpc.ClientConn
+}
+
+func (a *LocalAgent) Close() error {
+	return a.conn.Close()
+}
+
+func Agent(clix *cli.Context) (*LocalAgent, error) {
+	conn, err := grpc.Dial(clix.GlobalString("agent"), grpc.WithInsecure())
+	if err != nil {
+		return nil, err
+	}
+	return &LocalAgent{
+		AgentClient: v1.NewAgentClient(conn),
+		conn:        conn,
+	}, nil
 }
