@@ -30,8 +30,12 @@ var initCommand = cli.Command{
 		},
 	},
 	Action: func(clix *cli.Context) error {
+		ctx := Context()
 		c, err := config.Load()
 		if err != nil {
+			return err
+		}
+		if err := c.Containerd.Run(ctx, nil, clix); err != nil {
 			return err
 		}
 		client, err := system.NewClient()
@@ -74,7 +78,6 @@ var initCommand = cli.Command{
 			start        = time.Now()
 			fw           = progress.NewWriter(os.Stderr)
 			total        = float64(len(steps))
-			ctx          = system.Context()
 			stepProgress = make(chan output, 10)
 			current      = output{
 				i:    0,
