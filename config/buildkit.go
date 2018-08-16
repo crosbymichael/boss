@@ -1,10 +1,9 @@
-package step
+package config
 
 import (
 	"context"
 
 	"github.com/containerd/containerd"
-	"github.com/crosbymichael/boss/config"
 	"github.com/urfave/cli"
 )
 
@@ -21,7 +20,7 @@ Restart=always
 WantedBy=multi-user.target`
 
 type Buildkit struct {
-	Config *config.Config
+	Image string `toml:"image"`
 }
 
 func (s *Buildkit) Name() string {
@@ -30,7 +29,7 @@ func (s *Buildkit) Name() string {
 
 func (s *Buildkit) Run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
 	const name = "buildkit.service"
-	if err := install(ctx, client, s.Config.Buildkit.Image, clix); err != nil {
+	if err := install(ctx, client, s.Image, clix); err != nil {
 		return err
 	}
 	if err := writeUnit(name, buildkitUnit); err != nil {
@@ -40,7 +39,7 @@ func (s *Buildkit) Run(ctx context.Context, client *containerd.Client, clix *cli
 }
 
 func (s *Buildkit) Remove(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
-	if err := client.ImageService().Delete(ctx, s.Config.Buildkit.Image); err != nil {
+	if err := client.ImageService().Delete(ctx, s.Image); err != nil {
 		return err
 	}
 	const name = "buildkit.service"

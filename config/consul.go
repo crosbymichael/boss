@@ -1,4 +1,4 @@
-package step
+package config
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"text/template"
 
 	"github.com/containerd/containerd"
-	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/util"
 	"github.com/hashicorp/consul/api"
 	"github.com/urfave/cli"
@@ -26,8 +25,28 @@ RestartSec=5
 WantedBy=multi-user.target`
 
 type Consul struct {
-	Config    *config.Config
-	Bootstrap bool
+	Image string   `toml:"image"`
+	Join  []string `toml:"join"`
+	c     *Config
+}
+
+func (s *Consul) SubSteps() (o []Step) {
+	if len(s.Join) > 0 {
+		o = append(o, &Join{
+			IPs: s.Join,
+		},
+			&RegisterService{
+				Config: s.c,
+				ID:     "containerd",
+				Tags: []string{
+					"metrics",
+				},
+				Port: 9200,
+			},
+		)
+	}
+
+	return o
 }
 
 func (s *Consul) Name() string {
@@ -35,14 +54,14 @@ func (s *Consul) Name() string {
 }
 
 func (s *Consul) Run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
-	if err := install(ctx, client, s.Config.Consul.Image, clix); err != nil {
+	if err := install(ctx, client, s.Image, clix); err != nil {
 		return err
 	}
 	const name = "consul.service"
 	if err := os.MkdirAll("/var/lib/consul", 0711); err != nil {
 		return err
 	}
-	ip, err := util.GetIP(s.Config.Iface)
+	ip, err := util.GetIP(s.c.Iface)
 	if err != nil {
 		return err
 	}
@@ -52,11 +71,11 @@ func (s *Consul) Run(ctx context.Context, client *containerd.Client, clix *cli.C
 		ID        string
 		IP        string
 	}{
-		ID:     s.Config.ID,
-		Domain: s.Config.Domain,
+		ID:     s.c.ID,
+		Domain: s.c.Domain,
 		IP:     ip,
 	}
-	if s.Bootstrap {
+	if len(s.Join) == 0 {
 		tmplCtx.Bootstrap = "-bootstrap"
 	}
 	t, err := template.New("consul").Parse(consulUnit)
@@ -80,7 +99,7 @@ func (s *Consul) Remove(ctx context.Context, client *containerd.Client, clix *cl
 	if err := consul.Agent().Leave(); err != nil {
 		return err
 	}
-	if err := client.ImageService().Delete(ctx, s.Config.Consul.Image); err != nil {
+	if err := client.ImageService().Delete(ctx, s.Image); err != nil {
 		return err
 	}
 	const name = "consul.service"

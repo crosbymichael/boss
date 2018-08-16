@@ -1,11 +1,10 @@
-package step
+package config
 
 import (
 	"context"
 	"os"
 
 	"github.com/containerd/containerd"
-	"github.com/crosbymichael/boss/config"
 	"github.com/urfave/cli"
 )
 
@@ -17,9 +16,9 @@ func (s *Mkdir) Name() string {
 }
 
 func (s *Mkdir) Run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
-	return os.MkdirAll(config.Root, 0711)
+	return os.MkdirAll(Root, 0711)
 }
 
 func (s *Mkdir) Remove(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
-	return os.RemoveAll(config.Root)
+	return os.RemoveAll(Root)
 }

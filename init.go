@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/pkg/progress"
-	"github.com/crosbymichael/boss/step"
+	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/system"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -20,11 +20,6 @@ var initCommand = cli.Command{
 	Name:  "init",
 	Usage: "init boss on a system",
 	Flags: []cli.Flag{
-		cli.StringSliceFlag{
-			Name:  "join",
-			Usage: "list of consul servers to join",
-			Value: &cli.StringSlice{},
-		},
 		cli.BoolFlag{
 			Name:  "undo",
 			Usage: "remove all boss init steps from the system, :(",
@@ -45,75 +40,11 @@ var initCommand = cli.Command{
 		}
 		defer client.Close()
 		var (
-			hasConsul bool
-			steps     = step.DefaultSteps(c)
-			undo      = clix.Bool("undo")
+			undo  = clix.Bool("undo")
+			r     = bufio.NewScanner(os.Stdin)
+			steps = c.Steps()
 		)
-		if c.Consul != nil {
-			hasConsul = true
-			ips := clix.StringSlice("join")
-			steps = append(steps, &step.Consul{
-				Config:    c,
-				Bootstrap: len(ips) <= 0,
-			})
-			if len(ips) > 0 {
-				steps = append(steps, &step.Join{
-					IPs: ips,
-				})
-			}
-		}
-		if c.NodeMetrics != nil {
-			steps = append(steps, &step.NodeExporter{
-				Config: c,
-			})
-			if hasConsul {
-				steps = append(steps, &step.Register{
-					Config: c,
-					ID:     "node-exporter",
-					Tags: []string{
-						"metrics",
-					},
-					Port: 9100,
-				})
-			}
-		}
-		if c.Buildkit != nil {
-			steps = append(steps, &step.Buildkit{
-				Config: c,
-			})
-			if hasConsul {
-				steps = append(steps, &step.Register{
-					Config: c,
-					ID:     "buildkit",
-					Port:   9500,
-					Tags:   []string{"build"},
-				})
-			}
-		}
-		if c.CNI != nil {
-			steps = append(steps, &step.CNI{
-				Config: c,
-			})
-			if c.CNI.IPAM.Type == "dhcp" {
-				steps = append(steps, &step.DHCP{})
-			}
-		}
-		if hasConsul {
-			steps = append(steps, &step.Register{
-				Config: c,
-				ID:     "containerd",
-				Tags: []string{
-					"metrics",
-				},
-				Port: 9200,
-			})
-			steps = append(steps, &step.DNS{
-				ID: c.ID,
-			})
-		}
-		r := bufio.NewScanner(os.Stdin)
 		steps = filter(steps, clix.String("step"))
-
 		action := "install"
 		if undo {
 			action = "remove"
@@ -208,12 +139,12 @@ type output struct {
 	name string
 }
 
-func filter(steps []step.Step, filter string) (o []step.Step) {
+func filter(steps []config.Step, filter string) (o []config.Step) {
 	if filter == "" {
 		return steps
 	}
 	for _, s := range steps {
-		if s.Name() == filter || s.Name() == step.RegisterName(filter) {
+		if s.Name() == filter || s.Name() == config.RegisterName(filter) {
 			o = append(o, s)
 		}
 	}

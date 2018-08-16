@@ -1,17 +1,16 @@
-package step
+package config
 
 import (
 	"context"
 	"os/exec"
 
 	"github.com/containerd/containerd"
-	"github.com/crosbymichael/boss/config"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
 type Timezone struct {
-	Config *config.Config
+	TZ string
 }
 
 func (s *Timezone) Name() string {
@@ -19,7 +18,7 @@ func (s *Timezone) Name() string {
 }
 
 func (s *Timezone) Run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
-	tz := s.Config.Timezone
+	tz := s.TZ
 	if tz == "" {
 		return nil
 	}

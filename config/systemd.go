@@ -1,4 +1,4 @@
-package step
+package config
 
 import (
 	"context"

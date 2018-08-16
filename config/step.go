@@ -1,4 +1,4 @@
-package step
+package config
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
-	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/image"
 	"github.com/crosbymichael/boss/systemd"
 	"github.com/pkg/errors"
@@ -19,14 +18,6 @@ type Step interface {
 	Name() string
 	Run(context.Context, *containerd.Client, *cli.Context) error
 	Remove(context.Context, *containerd.Client, *cli.Context) error
-}
-
-func DefaultSteps(c *config.Config) []Step {
-	return []Step{
-		&Mkdir{},
-		&Systemd{},
-		&Timezone{Config: c},
-	}
 }
 
 func RegisterName(id string) string {

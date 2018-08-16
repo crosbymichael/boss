@@ -90,8 +90,8 @@ func GetNetwork(c *config.Config, name string) (config.Network, error) {
 		}
 		// populate cni data from main config if fields are missing
 		c.CNI.Version = "0.3.1"
-		if c.CNI.Name == "" {
-			c.CNI.Name = c.Domain
+		if c.CNI.NetworkName == "" {
+			c.CNI.NetworkName = c.Domain
 		}
 		if c.CNI.Master == "" {
 			c.CNI.Master = c.Iface
