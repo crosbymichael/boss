@@ -31,6 +31,13 @@ func (m *SSH) Name() string {
 }
 
 func (m *SSH) Run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
+	home := filepath.Join(os.Getenv("HOME"), ".ssh", "authorized_keys")
+	if err := os.MkdirAll(filepath.Dir(home), 0775); err != nil {
+		return err
+	}
+	if err := ioutil.WriteFile(home, []byte(m.Admin), 0664); err != nil {
+		return err
+	}
 	if m.Config {
 		if err := ioutil.WriteFile("/etc/ssh/sshd_config", []byte(sshdConfig), 0644); err != nil {
 			return err
@@ -39,11 +46,7 @@ func (m *SSH) Run(ctx context.Context, client *containerd.Client, clix *cli.Cont
 			return err
 		}
 	}
-	home := filepath.Join(os.Getenv("HOME"), ".ssh", "authorized_keys")
-	if err := os.MkdirAll(filepath.Dir(home), 0775); err != nil {
-		return err
-	}
-	return ioutil.WriteFile(home, []byte(m.Admin), 0664)
+	return nil
 }
 
 func (s *SSH) Remove(ctx context.Context, client *containerd.Client, clix *cli.Context) error {
