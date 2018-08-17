@@ -2,7 +2,6 @@ package agent
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 
@@ -16,6 +15,7 @@ import (
 	"github.com/crosbymichael/boss/flux"
 	"github.com/crosbymichael/boss/systemd"
 	"github.com/gogo/protobuf/types"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
@@ -81,21 +81,22 @@ func (a *Agent) Delete(ctx context.Context, req *v1.DeleteRequest) (*types.Empty
 	}
 	container, err := a.client.LoadContainer(ctx, id)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "load container")
 	}
 	if err := systemd.Stop(ctx, id); err != nil {
 		return nil, err
+		return nil, errors.Wrap(err, "stop service")
 	}
 	if err := systemd.Disable(ctx, id); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "disable service")
 	}
 	config, err := config.GetConfig(ctx, container)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "load config")
 	}
 	network, err := a.c.GetNetwork(config.Network)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "get network")
 	}
 	if err := network.Remove(ctx, container); err != nil {
 		return nil, err

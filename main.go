@@ -37,9 +37,10 @@ run containers like a boss`
 			Usage: "enable debug output in the logs",
 		},
 		cli.StringFlag{
-			Name:  "agent",
-			Usage: "agent address",
-			Value: "0.0.0.0:1337",
+			Name:   "agent",
+			Usage:  "agent address",
+			Value:  "0.0.0.0:1337",
+			EnvVar: "BOSS_AGENT",
 		},
 	}
 	app.Before = func(clix *cli.Context) error {

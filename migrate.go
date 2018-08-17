@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	typeurl.Register(&Container{}, "io.boss.v1.Container")
+	typeurl.Register(&Container{}, "io.boss.v0.Container")
 }
 
 var migrateCommand = cli.Command{
