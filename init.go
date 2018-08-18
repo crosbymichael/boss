@@ -24,9 +24,10 @@ var initCommand = cli.Command{
 			Name:  "undo",
 			Usage: "remove all boss init steps from the system, :(",
 		},
-		cli.StringFlag{
+		cli.StringSliceFlag{
 			Name:  "step",
-			Usage: "run a specific step by name",
+			Usage: "run a specific steps by name",
+			Value: &cli.StringSlice{},
 		},
 	},
 	Action: func(clix *cli.Context) error {
@@ -48,7 +49,7 @@ var initCommand = cli.Command{
 			r     = bufio.NewScanner(os.Stdin)
 			steps = c.Steps()
 		)
-		steps = filter(steps, clix.String("step"))
+		steps = filter(steps, clix.StringSlice("step"))
 		action := "install"
 		if undo {
 			action = "remove"
@@ -142,14 +143,23 @@ type output struct {
 	name string
 }
 
-func filter(steps []config.Step, filter string) (o []config.Step) {
-	if filter == "" {
+func filter(steps []config.Step, filter []string) (o []config.Step) {
+	if len(filter) == 0 {
 		return steps
 	}
 	for _, s := range steps {
-		if s.Name() == filter || s.Name() == config.RegisterName(filter) {
+		if hasFilter(filter, s.Name()) {
 			o = append(o, s)
 		}
 	}
 	return o
+}
+
+func hasFilter(filters []string, name string) bool {
+	for _, filter := range filters {
+		if name == filter || name == config.RegisterName(filter) {
+			return true
+		}
+	}
+	return false
 }
