@@ -14,7 +14,7 @@ import (
 func main() {
 	app := cli.NewApp()
 	app.Name = "boss"
-	app.Version = "12"
+	app.Version = "13-dev"
 	app.Usage = "run containers like a ross"
 	app.Description = `
 
