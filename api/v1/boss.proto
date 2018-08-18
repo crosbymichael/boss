@@ -17,6 +17,7 @@ service Agent {
 	rpc Start(StartRequest) returns (google.protobuf.Empty);
 	rpc Stop(StopRequest) returns (google.protobuf.Empty);
 	rpc Update(UpdateRequest) returns (UpdateResponse);
+	rpc PushBuild(PushBuildRequest) returns (google.protobuf.Empty);
 }
 
 message CreateRequest {
@@ -83,6 +84,10 @@ message UpdateRequest {
 
 message UpdateResponse {
 	Container container = 1;
+}
+
+message PushBuildRequest {
+	string ref = 1;
 }
 
 message Container {

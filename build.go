@@ -14,6 +14,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/crosbymichael/boss/api/v1"
 	"github.com/crosbymichael/boss/image"
 	"github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/client/llb"
@@ -84,6 +85,9 @@ var buildCommand = cli.Command{
 			Value: &cli.StringSlice{},
 		},
 	},
+	Subcommands: []cli.Command{
+		pushBuildCommand,
+	},
 	Action: func(clix *cli.Context) error {
 		if err := build(clix); err != nil {
 			return err
@@ -102,6 +106,22 @@ var buildCommand = cli.Command{
 		}
 		defer client.Close()
 		return image.Push(ctx, client, ref, clix)
+	},
+}
+
+var pushBuildCommand = cli.Command{
+	Name:  "push",
+	Usage: "push a build using the agent",
+	Action: func(clix *cli.Context) error {
+		agent, err := Agent(clix)
+		if err != nil {
+			return err
+		}
+		defer agent.Close()
+		_, err = agent.PushBuild(Context(), &v1.PushBuildRequest{
+			Ref: clix.Args().First(),
+		})
+		return err
 	},
 }
 

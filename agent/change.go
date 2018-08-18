@@ -21,7 +21,7 @@ type imageUpdateChange struct {
 }
 
 func (c *imageUpdateChange) update(ctx context.Context, container containerd.Container) error {
-	image, err := c.client.Pull(ctx, c.ref, containerd.WithPullUnpack, withPull(c.ref))
+	image, err := c.client.Pull(ctx, c.ref, containerd.WithPullUnpack, withPlainRemote(c.ref))
 	if err != nil {
 		return err
 	}

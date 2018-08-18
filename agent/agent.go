@@ -358,20 +358,32 @@ func (a *Agent) Rollback(ctx context.Context, req *v1.RollbackRequest) (*v1.Roll
 	return &v1.RollbackResponse{}, nil
 }
 
+func (a *Agent) PushBuild(ctx context.Context, req *v1.PushBuildRequest) (*types.Empty, error) {
+	if req.Ref == "" {
+		return nil, errors.New("no ref provided")
+	}
+	ctx = namespaces.WithNamespace(ctx, "buildkit")
+	image, err := a.client.GetImage(ctx, req.Ref)
+	if err != nil {
+		return nil, err
+	}
+	return empty, a.client.Push(ctx, req.Ref, image.Target(), withPlainRemote(req.Ref))
+}
+
 func (a *Agent) pull(ctx context.Context, ref string) (containerd.Image, error) {
 	image, err := a.client.GetImage(ctx, ref)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
 			return nil, err
 		}
-		if image, err = a.client.Pull(ctx, ref, containerd.WithPullUnpack, withPull(ref)); err != nil {
+		if image, err = a.client.Pull(ctx, ref, containerd.WithPullUnpack, withPlainRemote(ref)); err != nil {
 			return nil, err
 		}
 	}
 	return image, nil
 }
 
-func withPull(ref string) containerd.RemoteOpt {
+func withPlainRemote(ref string) containerd.RemoteOpt {
 	remote := strings.SplitN(ref, "/", 2)[0]
 	return func(_ *containerd.Client, ctx *containerd.RemoteContext) error {
 		ctx.Resolver = docker.NewResolver(docker.ResolverOptions{
