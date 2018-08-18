@@ -123,7 +123,11 @@ func (c *Config) GetNetwork(name string) (v1.Network, error) {
 		if c.CNI.Master == "" {
 			c.CNI.Master = c.Iface
 		}
-		n, err := gocni.New(gocni.WithPluginDir([]string{"/opt/containerd/bin"}), gocni.WithConf(c.CNI.Bytes()), gocni.WithLoNetwork)
+		n, err := gocni.New(
+			gocni.WithPluginDir([]string{"/opt/containerd/bin"}),
+			gocni.WithConf(c.CNI.Bytes()),
+			gocni.WithLoNetwork,
+		)
 		if err != nil {
 			return nil, err
 		}

@@ -19,6 +19,7 @@ Restart=always
 WantedBy=multi-user.target`
 
 type Agent struct {
+	PlainRemotes []string `toml:"plain_remotes"`
 }
 
 func (s *Agent) Name() string {

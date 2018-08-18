@@ -2,13 +2,16 @@ package agent
 
 import (
 	"context"
+	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/typeurl"
 	"github.com/crosbymichael/boss/api/v1"
 	"github.com/crosbymichael/boss/config"
@@ -21,7 +24,8 @@ import (
 )
 
 var (
-	ErrNoID = errors.New("no id provided")
+	ErrNoID      = errors.New("no id provided")
+	plainRemotes = make(map[string]bool)
 
 	empty = &types.Empty{}
 )
@@ -30,6 +34,9 @@ func New(c *config.Config, client *containerd.Client, store config.ConfigStore) 
 	register, err := c.GetRegister()
 	if err != nil {
 		return nil, err
+	}
+	for _, r := range c.Agent.PlainRemotes {
+		plainRemotes[r] = true
 	}
 	return &Agent{
 		c:        c,
@@ -357,11 +364,22 @@ func (a *Agent) pull(ctx context.Context, ref string) (containerd.Image, error) 
 		if !errdefs.IsNotFound(err) {
 			return nil, err
 		}
-		if image, err = a.client.Pull(ctx, ref, containerd.WithPullUnpack); err != nil {
+		if image, err = a.client.Pull(ctx, ref, containerd.WithPullUnpack, withPull(ref)); err != nil {
 			return nil, err
 		}
 	}
 	return image, nil
+}
+
+func withPull(ref string) containerd.RemoteOpt {
+	remote := strings.SplitN(ref, "/", 2)[0]
+	return func(_ *containerd.Client, ctx *containerd.RemoteContext) error {
+		ctx.Resolver = docker.NewResolver(docker.ResolverOptions{
+			PlainHTTP: plainRemotes[remote],
+			Client:    http.DefaultClient,
+		})
+		return nil
+	}
 }
 
 func getBindSizes(c *v1.Container) (size int64, _ error) {
