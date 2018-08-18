@@ -13,6 +13,7 @@ import (
 	"github.com/crosbymichael/boss/api/v1"
 	"github.com/crosbymichael/boss/route"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
@@ -77,10 +78,10 @@ func (n *cni) Create(ctx context.Context, task containerd.Container) (string, er
 func (n *cni) Remove(ctx context.Context, c containerd.Container) error {
 	path := v1.NetworkPath(c.ID())
 	if err := n.network.Remove(c.ID(), path); err != nil {
-		return err
+		logrus.WithError(err).Error("remove cni networking")
 	}
 	if err := unix.Unmount(path, 0); err != nil {
-		return err
+		logrus.WithError(err).Error("unmount netns")
 	}
 	if n.nt == "macvlan" {
 		info, err := c.Info(ctx)
@@ -90,7 +91,7 @@ func (n *cni) Remove(ctx context.Context, c containerd.Container) error {
 		ip := info.Labels[v1.IPLabel]
 		if ip != "" {
 			if err := route.Remove(ip); err != nil {
-				return err
+				logrus.WithError(err).Error("remove routes")
 			}
 		}
 	}
