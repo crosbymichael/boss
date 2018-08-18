@@ -24,7 +24,7 @@ After=network-online.target containerd.service network.target
 [Service]
 ExecStartPre=/usr/local/bin/boss systemd exec-start-pre %i
 ExecStart=/usr/local/bin/boss systemd exec-start %i
-ExecStartPost=/usr/local/bin/boss systemd exec-start-post %i
+ExecStopPost=/usr/local/bin/boss systemd exec-stop-post %i
 Restart=always
 RestartSec=5
 

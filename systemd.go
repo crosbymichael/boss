@@ -36,7 +36,7 @@ var systemdCommand = cli.Command{
 	Subcommands: []cli.Command{
 		systemdExecStartPreCommand,
 		systemdExecStartCommand,
-		systemdExecStartPostCommand,
+		systemdExecStopPostCommand,
 	},
 }
 
@@ -59,9 +59,9 @@ var systemdExecStartPreCommand = cli.Command{
 	},
 }
 
-var systemdExecStartPostCommand = cli.Command{
-	Name:  "exec-start-post",
-	Usage: "exec-start-post proxy for containers",
+var systemdExecStopPostCommand = cli.Command{
+	Name:  "exec-stop-post",
+	Usage: "exec-stop-post proxy for containers",
 	Action: func(clix *cli.Context) error {
 		id := clix.Args().First()
 		err := cleanupPreviousTask(id)

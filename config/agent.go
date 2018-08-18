@@ -12,8 +12,10 @@ Description=boss agent
 After=containerd.service network.target
 
 [Service]
+ExecStartPre=/bin/mount -a
 ExecStart=/usr/local/bin/boss agent
 Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target`
