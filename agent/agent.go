@@ -386,7 +386,8 @@ func getBindSizes(c *v1.Container) (size int64, _ error) {
 	for _, m := range c.Mounts {
 		f, err := os.Open(m.Source)
 		if err != nil {
-			return size, err
+			logrus.WithError(err).Warnf("unable to open bind for size %s", m.Source)
+			continue
 		}
 		info, err := f.Stat()
 		if err != nil {

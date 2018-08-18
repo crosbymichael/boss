@@ -78,6 +78,11 @@ var buildCommand = cli.Command{
 			Name:  "no-export",
 			Usage: "don't export the build",
 		},
+		cli.StringSliceFlag{
+			Name:  "build-arg",
+			Usage: "set build args",
+			Value: &cli.StringSlice{},
+		},
 	},
 	Action: func(clix *cli.Context) error {
 		if err := build(clix); err != nil {
@@ -121,16 +126,25 @@ func build(clicontext *cli.Context) error {
 	if clicontext.Bool("no-export") {
 		exporter = ""
 	}
+	atters := make(map[string]string)
+
+	for _, a := range clicontext.StringSlice("build-arg") {
+		kv := strings.SplitN(a, "=", 2)
+		if len(kv) != 2 {
+			return errors.Errorf("invalid build-arg value %s", a)
+		}
+		atters["build-arg:"+kv[0]] = kv[1]
+	}
 
 	solveOpt := client.SolveOpt{
 		Exporter: exporter,
 		// ExporterAttrs is set later
 		// LocalDirs is set later
-		Frontend: "dockerfile.v0",
-		// FrontendAttrs is set later
-		ExportCache: clicontext.String("export-cache"),
-		ImportCache: clicontext.StringSlice("import-cache"),
-		Session:     []session.Attachable{authprovider.NewDockerAuthProvider()},
+		Frontend:      "dockerfile.v0",
+		FrontendAttrs: atters,
+		ExportCache:   clicontext.String("export-cache"),
+		ImportCache:   clicontext.StringSlice("import-cache"),
+		Session:       []session.Attachable{authprovider.NewDockerAuthProvider()},
 	}
 	if !clicontext.Bool("no-export") {
 		name := clicontext.String("name")
