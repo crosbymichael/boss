@@ -2,7 +2,6 @@ package config
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -13,6 +12,7 @@ import (
 	"github.com/crosbymichael/boss/api/v1"
 	"github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
@@ -106,7 +106,7 @@ func (t *Template) Render(ctx context.Context) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0711); err != nil {
 		return err
 	}
-	f, err := ioutil.TempFile("/run/boss", t.Name)
+	f, err := os.OpenFile(path, unix.O_CREAT|unix.O_WRONLY|unix.O_TRUNC, 0666)
 	if err != nil {
 		return err
 	}
@@ -118,8 +118,7 @@ func (t *Template) Render(ctx context.Context) error {
 		f.Close()
 		return err
 	}
-	f.Close()
-	return os.Rename(f.Name(), path)
+	return f.Close()
 }
 
 func (t *Template) Watch(ctx context.Context, kv *api.KV, ch chan error) {
@@ -133,6 +132,10 @@ func (t *Template) Watch(ctx context.Context, kv *api.KV, ch chan error) {
 			if err != nil {
 				ch <- err
 				time.Sleep(2 * time.Second)
+			}
+			if t.Index == meta.LastIndex {
+				logrus.Infof("got same index %d", t.Index)
+				continue
 			}
 			t.Index = meta.LastIndex
 			t.Data = data.Value
