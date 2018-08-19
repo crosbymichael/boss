@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net"
 	"os"
 	"os/signal"
@@ -9,6 +10,8 @@ import (
 	"github.com/crosbymichael/boss/api/v1"
 	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/system"
+	raven "github.com/getsentry/raven-go"
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
@@ -55,9 +58,28 @@ var agentCommand = cli.Command{
 }
 
 func newServer() *grpc.Server {
-	s := grpc.NewServer()
+	s := grpc.NewServer(
+		grpc.UnaryInterceptor(unary),
+		grpc.StreamInterceptor(stream),
+	)
 
 	hs := health.NewServer()
 	grpc_health_v1.RegisterHealthServer(s, hs)
 	return s
+}
+
+func unary(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+	r, err := grpc_prometheus.UnaryServerInterceptor(ctx, req, info, handler)
+	if err != nil {
+		raven.CaptureError(err, nil)
+	}
+	return r, err
+}
+
+func stream(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	err := grpc_prometheus.StreamServerInterceptor(srv, ss, info, handler)
+	if err != nil {
+		raven.CaptureError(err, nil)
+	}
+	return err
 }

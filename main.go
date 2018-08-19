@@ -7,14 +7,17 @@ import (
 
 	"github.com/containerd/containerd/namespaces"
 	"github.com/crosbymichael/boss/api/v1"
+	raven "github.com/getsentry/raven-go"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
+var Version string
+
 func main() {
 	app := cli.NewApp()
 	app.Name = "boss"
-	app.Version = "13-dev"
+	app.Version = Version
 	app.Usage = "run containers like a ross"
 	app.Description = `
 
@@ -42,10 +45,19 @@ run containers like a boss`
 			Value:  "0.0.0.0:1337",
 			EnvVar: "BOSS_AGENT",
 		},
+		cli.StringFlag{
+			Name:   "sentry-dsn",
+			Usage:  "sentry DSN",
+			EnvVar: "SENTRY_DSN",
+		},
 	}
 	app.Before = func(clix *cli.Context) error {
 		if clix.GlobalBool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
+		}
+		if dsn := clix.GlobalString("sentry-dsn"); dsn != "" {
+			raven.SetDSN(dsn)
+			raven.DefaultClient.SetRelease(Version)
 		}
 		return nil
 	}
@@ -68,6 +80,7 @@ run containers like a boss`
 	}
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		raven.CaptureErrorAndWait(err, nil)
 		os.Exit(1)
 	}
 }
