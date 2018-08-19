@@ -7,6 +7,7 @@ import (
 
 	"github.com/containerd/containerd/namespaces"
 	"github.com/crosbymichael/boss/api/v1"
+	"github.com/crosbymichael/boss/version"
 	raven "github.com/getsentry/raven-go"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -17,7 +18,7 @@ var Version string
 func main() {
 	app := cli.NewApp()
 	app.Name = "boss"
-	app.Version = Version
+	app.Version = version.Version
 	app.Usage = "run containers like a ross"
 	app.Description = `
 
@@ -57,7 +58,7 @@ run containers like a boss`
 		}
 		if dsn := clix.GlobalString("sentry-dsn"); dsn != "" {
 			raven.SetDSN(dsn)
-			raven.DefaultClient.SetRelease(Version)
+			raven.DefaultClient.SetRelease(version.Version)
 		}
 		return nil
 	}
