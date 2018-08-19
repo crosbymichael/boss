@@ -136,10 +136,11 @@ func WithConfListFile(fileName string) CNIOpt {
 		if err != nil {
 			return err
 		}
+		i := len(c.networks)
 		c.networks = append(c.networks, &Network{
 			cni:    c.cniConfig,
 			config: confList,
-			ifName: getIfName(c.prefix, 0),
+			ifName: getIfName(c.prefix, i),
 		})
 		return nil
 	}

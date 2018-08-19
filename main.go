@@ -18,6 +18,7 @@ var Version string
 func main() {
 	app := cli.NewApp()
 	app.Name = "boss"
+	// haha semver
 	app.Version = version.Version
 	app.Usage = "run containers like a ross"
 	app.Description = `
