@@ -11,11 +11,7 @@ import (
 	"time"
 
 	"github.com/containerd/console"
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/defaults"
-	"github.com/containerd/containerd/namespaces"
 	"github.com/crosbymichael/boss/api/v1"
-	"github.com/crosbymichael/boss/image"
 	"github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/client/llb"
 	"github.com/moby/buildkit/session"
@@ -55,10 +51,6 @@ var buildCommand = cli.Command{
 			Name:  "push",
 			Usage: "push the resulting image",
 		},
-		cli.BoolFlag{
-			Name:  "plain-http",
-			Usage: "don't push with https",
-		},
 		cli.StringFlag{
 			Name:  "dockerfile,d",
 			Usage: "set the specific dockerfile",
@@ -96,16 +88,15 @@ var buildCommand = cli.Command{
 			return nil
 		}
 		ref := clix.String("name")
-		ctx := namespaces.WithNamespace(context.Background(), "buildkit")
-		client, err := containerd.New(
-			defaults.DefaultAddress,
-			containerd.WithDefaultRuntime("io.containerd.runc.v1"),
-		)
+		agent, err := Agent(clix)
 		if err != nil {
 			return err
 		}
-		defer client.Close()
-		return image.Push(ctx, client, ref, clix)
+		defer agent.Close()
+		_, err = agent.PushBuild(Context(), &v1.PushBuildRequest{
+			Ref: ref,
+		})
+		return err
 	},
 }
 
