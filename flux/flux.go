@@ -2,7 +2,6 @@ package flux
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -10,17 +9,20 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/diff/apply"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/opencontainers/image-spec/identity"
+	"github.com/pkg/errors"
 )
 
 const (
 	gcRoot           = "containerd.io/gc.root"
 	timestampFormat  = "01-02-2006-15:04:05"
-	previousRevision = "boss.io/revision.previous"
+	PreviousLabel    = "boss.io/revision.previous"
 	ImageLabel       = "boss.io/revision.image"
+	ContainerIDLabel = "boss.io/revision.container"
 )
 
 var ErrNoPreviousRevision = errors.New("no previous revision")
@@ -77,6 +79,31 @@ func WithRollback(ctx context.Context, client *containerd.Client, c *containers.
 	return nil
 }
 
+// WithRevisionCleanup cleans up all revisions for a container
+func WithRevisionCleanup(ctx context.Context, client *containerd.Client, c containers.Container) error {
+	if c.Snapshotter == "" {
+		return errors.Wrapf(errdefs.ErrInvalidArgument, "container.Snapshotter must be set to cleanup rootfs snapshot")
+	}
+	var (
+		keys []string
+		ss   = client.SnapshotService(c.Snapshotter)
+	)
+	if err := ss.Walk(ctx, func(ctx context.Context, si snapshots.Info) error {
+		if si.Labels[ContainerIDLabel] == c.ID {
+			keys = append(keys, si.Name)
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	for _, key := range keys {
+		if err := client.SnapshotService(c.Snapshotter).Remove(ctx, key); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func newRevision(id string) *Revision {
 	now := time.Now()
 	return &Revision{
@@ -105,11 +132,12 @@ func create(ctx context.Context, client *containerd.Client, i containerd.Image, 
 		r      = newRevision(id)
 	)
 	labels := map[string]string{
-		gcRoot:     r.Timestamp.Format(time.RFC3339),
-		ImageLabel: i.Name(),
+		gcRoot:           r.Timestamp.Format(time.RFC3339),
+		ImageLabel:       i.Name(),
+		ContainerIDLabel: id,
 	}
 	if previous != "" {
-		labels[previousRevision] = previous
+		labels[PreviousLabel] = previous
 	}
 	mounts, err := client.SnapshotService(containerd.DefaultSnapshotter).Prepare(ctx, r.Key, parent, snapshots.WithLabels(labels))
 	if err != nil {
@@ -143,7 +171,7 @@ func previous(ctx context.Context, client *containerd.Client, c *containers.Cont
 	if err != nil {
 		return nil, err
 	}
-	key := sInfo.Labels[previousRevision]
+	key := sInfo.Labels[PreviousLabel]
 	if key == "" {
 		return nil, ErrNoPreviousRevision
 	}

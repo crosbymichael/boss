@@ -12,6 +12,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/remotes/docker"
+	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/typeurl"
 	"github.com/crosbymichael/boss/api/v1"
 	"github.com/crosbymichael/boss/config"
@@ -123,7 +124,7 @@ func (a *Agent) Delete(ctx context.Context, req *v1.DeleteRequest) (*types.Empty
 			logrus.WithError(err).Errorf("de-register %s-%s", id, name)
 		}
 	}
-	return empty, container.Delete(ctx, containerd.WithSnapshotCleanup)
+	return empty, container.Delete(ctx, flux.WithRevisionCleanup)
 }
 
 func (a *Agent) Get(ctx context.Context, req *v1.GetRequest) (*v1.GetResponse, error) {
@@ -150,13 +151,50 @@ func (a *Agent) info(ctx context.Context, c containerd.Container) (*v1.Container
 	if err != nil {
 		return nil, err
 	}
+	d := info.Extensions[opts.CurrentConfig]
+	cfg, err := opts.UnmarshalConfig(&d)
+	if err != nil {
+		return nil, err
+	}
+
+	service := a.client.SnapshotService(info.Snapshotter)
+	usage, err := service.Usage(ctx, info.SnapshotKey)
+	if err != nil {
+		return nil, err
+	}
+	var ss []*v1.Snapshot
+	if err := service.Walk(ctx, func(ctx context.Context, si snapshots.Info) error {
+		if si.Labels[flux.ContainerIDLabel] != c.ID() {
+			return nil
+		}
+		usage, err := service.Usage(ctx, si.Name)
+		if err != nil {
+			return err
+		}
+		ss = append(ss, &v1.Snapshot{
+			ID:       si.Name,
+			Created:  si.Created,
+			Previous: si.Labels[flux.PreviousLabel],
+			FsSize:   usage.Size,
+		})
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	bindSizes, err := getBindSizes(cfg)
+	if err != nil {
+		return nil, err
+	}
 	task, err := c.Task(ctx, nil)
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			return &v1.ContainerInfo{
-				ID:     c.ID(),
-				Image:  info.Image,
-				Status: string(containerd.Stopped),
+				ID:        c.ID(),
+				Image:     info.Image,
+				Status:    string(containerd.Stopped),
+				FsSize:    usage.Size + bindSizes,
+				Config:    cfg,
+				Snapshots: ss,
 			}, nil
 		}
 		return nil, err
@@ -169,30 +207,16 @@ func (a *Agent) info(ctx context.Context, c containerd.Container) (*v1.Container
 	if err != nil {
 		return nil, err
 	}
-	d := info.Extensions[opts.CurrentConfig]
-	cfg, err := opts.UnmarshalConfig(&d)
-	if err != nil {
-		return nil, err
-	}
 	v, err := typeurl.UnmarshalAny(stats.Data)
 	if err != nil {
 		return nil, err
 	}
 	var (
-		cg      = v.(*cgroups.Metrics)
-		cpu     = cg.CPU.Usage.Total
-		memory  = float64(cg.Memory.Usage.Usage - cg.Memory.TotalCache)
-		limit   = float64(cg.Memory.Usage.Limit)
-		service = a.client.SnapshotService(info.Snapshotter)
+		cg     = v.(*cgroups.Metrics)
+		cpu    = cg.CPU.Usage.Total
+		memory = float64(cg.Memory.Usage.Usage - cg.Memory.TotalCache)
+		limit  = float64(cg.Memory.Usage.Limit)
 	)
-	usage, err := service.Usage(ctx, info.SnapshotKey)
-	if err != nil {
-		return nil, err
-	}
-	bindSizes, err := getBindSizes(cfg)
-	if err != nil {
-		return nil, err
-	}
 	return &v1.ContainerInfo{
 		ID:          c.ID(),
 		Image:       info.Image,
@@ -205,6 +229,7 @@ func (a *Agent) info(ctx context.Context, c containerd.Container) (*v1.Container
 		PidLimit:    cg.Pids.Limit,
 		FsSize:      usage.Size + bindSizes,
 		Config:      cfg,
+		Snapshots:   ss,
 	}, nil
 }
 

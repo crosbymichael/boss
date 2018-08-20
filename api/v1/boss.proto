@@ -4,6 +4,7 @@ package io.boss.v1;
 
 import weak "gogoproto/gogo.proto";
 import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/crosbymichael/boss/api/v1;v1";
 
@@ -62,6 +63,14 @@ message ContainerInfo {
 	uint64 pid_limit = 9;
 	int64 fs_size = 10;
 	Container config = 11;
+	repeated Snapshot snapshots = 12;
+}
+
+message Snapshot {
+	string id = 1 [(gogoproto.customname) = "ID"];;
+	google.protobuf.Timestamp created = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+	string previous = 3;
+	int64 fs_size = 4;
 }
 
 message RollbackRequest {
