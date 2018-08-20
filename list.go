@@ -26,8 +26,8 @@ var listCommand = cli.Command{
 			return err
 		}
 		w := tabwriter.NewWriter(os.Stdout, 10, 1, 3, ' ', 0)
-		const tfmt = "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n"
-		fmt.Fprint(w, "ID\tIMAGE\tSTATUS\tIP\tCPU\tMEMORY\tPIDS\tSIZE\n")
+		const tfmt = "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\n"
+		fmt.Fprint(w, "ID\tIMAGE\tSTATUS\tIP\tCPU\tMEMORY\tPIDS\tSIZE\tREVISIONS\n")
 		for _, c := range resp.Containers {
 			fmt.Fprintf(w, tfmt,
 				c.ID,
@@ -38,6 +38,7 @@ var listCommand = cli.Command{
 				fmt.Sprintf("%s/%s", units.HumanSize(c.MemoryUsage), units.HumanSize(c.MemoryLimit)),
 				fmt.Sprintf("%d/%d", c.PidUsage, c.PidLimit),
 				units.HumanSize(float64(c.FsSize)),
+				len(c.Snapshots),
 			)
 		}
 		return w.Flush()
