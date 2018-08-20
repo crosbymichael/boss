@@ -15,6 +15,7 @@ type Container struct {
 	Network   string             `toml:"network"`
 	Services  map[string]Service `toml:"services"`
 	Configs   map[string]File    `toml:"configs"`
+	Readonly  bool               `toml:"readonly"`
 }
 
 func (c *Container) Proto() *v1.Container {
@@ -26,6 +27,7 @@ func (c *Container) Proto() *v1.Container {
 			Args: c.Args,
 			Env:  c.Env,
 		},
+		Readonly: c.Readonly,
 		Services: make(map[string]*v1.Service),
 		Configs:  make(map[string]*v1.Config),
 	}

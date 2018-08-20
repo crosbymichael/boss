@@ -303,6 +303,9 @@ func specOpt(config *v1.Container, image containerd.Image) oci.SpecOpts {
 	if config.Process.User != nil {
 		opts = append(opts, oci.WithUIDGID(config.Process.User.Uid, config.Process.User.Gid))
 	}
+	if config.Readonly {
+		opts = append(opts, oci.WithRootFSReadonly())
+	}
 	return oci.Compose(opts...)
 }
 

@@ -101,6 +101,7 @@ message Container {
 	GPUs gpus = 7;
 	map<string, Service> services = 8;
 	map<string, Config> configs = 9;
+	bool readonly = 10;
 }
 
 message Config {
