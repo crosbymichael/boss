@@ -55,7 +55,7 @@ type Agent struct {
 
 func (a *Agent) Create(ctx context.Context, req *v1.CreateRequest) (*types.Empty, error) {
 	ctx = relayContext(ctx)
-	image, err := a.pull(ctx, req.Container.Image)
+	image, err := a.client.Pull(ctx, req.Container.Image, containerd.WithPullUnpack, withPlainRemote(req.Container.Image))
 	if err != nil {
 		return nil, err
 	}
@@ -377,19 +377,6 @@ func (a *Agent) PushBuild(ctx context.Context, req *v1.PushBuildRequest) (*types
 		return nil, err
 	}
 	return empty, a.client.Push(ctx, req.Ref, image.Target(), withPlainRemote(req.Ref))
-}
-
-func (a *Agent) pull(ctx context.Context, ref string) (containerd.Image, error) {
-	image, err := a.client.GetImage(ctx, ref)
-	if err != nil {
-		if !errdefs.IsNotFound(err) {
-			return nil, err
-		}
-		if image, err = a.client.Pull(ctx, ref, containerd.WithPullUnpack, withPlainRemote(ref)); err != nil {
-			return nil, err
-		}
-	}
-	return image, nil
 }
 
 func withPlainRemote(ref string) containerd.RemoteOpt {
