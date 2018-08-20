@@ -7,7 +7,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/typeurl"
-	"github.com/crosbymichael/boss/config"
+	"github.com/crosbymichael/boss/opts"
 	"github.com/crosbymichael/boss/system"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
@@ -30,7 +30,7 @@ var migrateCommand = cli.Command{
 			return err
 		}
 		for _, c := range containers {
-			if _, err := config.GetConfig(ctx, c); err == nil {
+			if _, err := opts.GetConfig(ctx, c); err == nil {
 				continue
 			}
 			fmt.Println("migrating", c.ID())
@@ -53,8 +53,8 @@ func withMigrate(current *Container) func(ctx context.Context, client *container
 		if err != nil {
 			return err
 		}
-		c.Extensions[config.LastConfig] = *any
-		c.Extensions[config.CurrentConfig] = *any
+		c.Extensions[opts.LastConfig] = *any
+		c.Extensions[opts.CurrentConfig] = *any
 		return nil
 	}
 }
@@ -64,7 +64,7 @@ func loadOldConfig(ctx context.Context, container containerd.Container) (*Contai
 	if err != nil {
 		return nil, errors.Wrap(err, "load info")
 	}
-	d := info.Extensions[config.CurrentConfig]
+	d := info.Extensions[opts.CurrentConfig]
 	v, err := typeurl.UnmarshalAny(&d)
 	if err != nil {
 		return nil, errors.Wrap(err, "unmarshal any")

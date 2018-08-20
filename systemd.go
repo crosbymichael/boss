@@ -17,6 +17,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/crosbymichael/boss/api/v1"
 	"github.com/crosbymichael/boss/config"
+	"github.com/crosbymichael/boss/opts"
 	"github.com/crosbymichael/boss/system"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
@@ -79,7 +80,7 @@ var systemdExecStopPostCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		config, err := config.GetConfig(ctx, container)
+		config, err := opts.GetConfig(ctx, container)
 		if err != nil {
 			return err
 		}
@@ -113,7 +114,7 @@ var systemdExecStartCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		cfg, err := config.GetConfig(ctx, container)
+		cfg, err := opts.GetConfig(ctx, container)
 		if err != nil {
 			return err
 		}

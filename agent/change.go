@@ -9,6 +9,7 @@ import (
 	"github.com/crosbymichael/boss/api/v1"
 	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/flux"
+	"github.com/crosbymichael/boss/opts"
 )
 
 type change interface {
@@ -47,7 +48,7 @@ func (c *configChange) update(ctx context.Context, container containerd.Containe
 	if err != nil {
 		return err
 	}
-	return container.Update(ctx, config.WithSetPreviousConfig, config.WithBossConfig(c.c, image))
+	return container.Update(ctx, opts.WithSetPreviousConfig, opts.WithBossConfig(c.c, image))
 }
 
 type filesChange struct {

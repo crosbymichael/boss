@@ -16,6 +16,7 @@ import (
 	"github.com/crosbymichael/boss/api/v1"
 	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/flux"
+	"github.com/crosbymichael/boss/opts"
 	"github.com/crosbymichael/boss/systemd"
 	"github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
@@ -71,7 +72,7 @@ func (a *Agent) Create(ctx context.Context, req *v1.CreateRequest) (*types.Empty
 	container, err := a.client.NewContainer(ctx,
 		req.Container.ID,
 		flux.WithNewSnapshot(image),
-		config.WithBossConfig(req.Container, image),
+		opts.WithBossConfig(req.Container, image),
 	)
 	if err != nil {
 		return nil, err
@@ -106,7 +107,7 @@ func (a *Agent) Delete(ctx context.Context, req *v1.DeleteRequest) (*types.Empty
 	if err := systemd.Disable(ctx, id); err != nil {
 		return nil, errors.Wrap(err, "disable service")
 	}
-	config, err := config.GetConfig(ctx, container)
+	config, err := opts.GetConfig(ctx, container)
 	if err != nil {
 		return nil, errors.Wrap(err, "load config")
 	}
@@ -135,7 +136,7 @@ func (a *Agent) Get(ctx context.Context, req *v1.GetRequest) (*v1.GetResponse, e
 	if err != nil {
 		return nil, err
 	}
-	config, err := config.GetConfig(ctx, container)
+	config, err := opts.GetConfig(ctx, container)
 	if err != nil {
 		return nil, err
 	}
@@ -168,8 +169,8 @@ func (a *Agent) listContainer(ctx context.Context, c containerd.Container) (*v1.
 	if err != nil {
 		return nil, err
 	}
-	d := info.Extensions[config.CurrentConfig]
-	cfg, err := config.UnmarshalConfig(&d)
+	d := info.Extensions[opts.CurrentConfig]
+	cfg, err := opts.UnmarshalConfig(&d)
 	if err != nil {
 		return nil, err
 	}
@@ -238,7 +239,7 @@ func (a *Agent) Kill(ctx context.Context, req *v1.KillRequest) (*types.Empty, er
 	if err != nil {
 		return nil, err
 	}
-	config, err := config.GetConfig(ctx, container)
+	config, err := opts.GetConfig(ctx, container)
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +287,7 @@ func (a *Agent) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateRe
 	if err != nil {
 		return nil, err
 	}
-	current, err := config.GetConfig(ctx, container)
+	current, err := opts.GetConfig(ctx, container)
 	if err != nil {
 		return nil, err
 	}
@@ -352,7 +353,7 @@ func (a *Agent) Rollback(ctx context.Context, req *v1.RollbackRequest) (*v1.Roll
 		return nil, err
 	}
 	err = pauseAndRun(ctx, container, func() error {
-		if err := container.Update(ctx, flux.WithRollback, config.WithRollback); err != nil {
+		if err := container.Update(ctx, flux.WithRollback, opts.WithRollback); err != nil {
 			return err
 		}
 		task, err := container.Task(ctx, nil)
