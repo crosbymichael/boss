@@ -11,6 +11,7 @@ import (
 	"github.com/containerd/containerd"
 	networking "github.com/containerd/go-cni"
 	"github.com/crosbymichael/boss/api/v1"
+	"github.com/crosbymichael/boss/opts"
 	"github.com/crosbymichael/boss/route"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -57,7 +58,7 @@ func (n *cni) Create(ctx context.Context, task containerd.Container) (string, er
 				break
 			}
 		}
-		if err := task.Update(ctx, v1.WithIP(ip.String())); err != nil {
+		if err := task.Update(ctx, opts.WithIP(ip.String())); err != nil {
 			return "", err
 		}
 		if n.nt == "macvlan" {
@@ -72,7 +73,7 @@ func (n *cni) Create(ctx context.Context, task containerd.Container) (string, er
 	if err != nil {
 		return "", err
 	}
-	return l[v1.IPLabel], nil
+	return l[opts.IPLabel], nil
 }
 
 func (n *cni) Remove(ctx context.Context, c containerd.Container) error {
@@ -88,7 +89,7 @@ func (n *cni) Remove(ctx context.Context, c containerd.Container) error {
 		if err != nil {
 			return err
 		}
-		ip := info.Labels[v1.IPLabel]
+		ip := info.Labels[opts.IPLabel]
 		if ip != "" {
 			if err := route.Remove(ip); err != nil {
 				logrus.WithError(err).Error("remove routes")

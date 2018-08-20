@@ -197,7 +197,7 @@ func (a *Agent) listContainer(ctx context.Context, c containerd.Container) (*v1.
 		ID:          c.ID(),
 		Image:       info.Image,
 		Status:      string(status.Status),
-		IP:          info.Labels[v1.IPLabel],
+		IP:          info.Labels[opts.IPLabel],
 		Cpu:         cpu,
 		MemoryUsage: memory,
 		MemoryLimit: limit,

@@ -23,6 +23,7 @@ import (
 const (
 	CurrentConfig = "io.boss/container"
 	LastConfig    = "io.boss/container.last"
+	IPLabel       = "io/boss/container.ip"
 )
 
 // WithBossConfig is a containerd.NewContainerOpts for spec and container configuration
@@ -259,4 +260,15 @@ func UnmarshalConfig(any *types.Any) (*v1.Container, error) {
 		return nil, ErrOldConfigFormat
 	}
 	return c, nil
+}
+
+// WithIP sets the ip on the container
+func WithIP(ip string) containerd.UpdateContainerOpts {
+	return func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
+		if c.Labels == nil {
+			c.Labels = make(map[string]string)
+		}
+		c.Labels[IPLabel] = ip
+		return nil
+	}
 }

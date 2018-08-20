@@ -243,7 +243,7 @@ func setupNetworking(ctx context.Context, container containerd.Container, c *v1.
 		return err
 	}
 	if ip != "" {
-		if err := container.Update(ctx, v1.WithIP(ip)); err != nil {
+		if err := container.Update(ctx, opts.WithIP(ip)); err != nil {
 			return err
 		}
 		logrus.WithField("id", container.ID()).WithField("ip", ip).Info("setup network interface")
