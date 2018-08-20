@@ -68,8 +68,14 @@ var buildCommand = cli.Command{
 			EnvVar: "BOSS_BUILDKIT",
 		},
 		cli.BoolFlag{
-			Name:  "no-export",
-			Usage: "don't export the build",
+			Name:   "no-export",
+			Usage:  "don't export the build",
+			Hidden: true,
+		},
+		cli.StringFlag{
+			Name:  "exporter",
+			Usage: "set the buildkit exporter",
+			Value: "image",
 		},
 		cli.StringSliceFlag{
 			Name:  "build-arg",
@@ -133,7 +139,7 @@ func build(clicontext *cli.Context) error {
 	ch := make(chan *client.SolveStatus)
 	eg, ctx := errgroup.WithContext(commandContext(clicontext))
 
-	exporter := "image"
+	exporter := clicontext.String("exporter")
 	if clicontext.Bool("no-export") {
 		exporter = ""
 	}
@@ -165,6 +171,9 @@ func build(clicontext *cli.Context) error {
 		solveOpt.ExporterAttrs, err = attrMap(fmt.Sprintf("name=%s", name))
 		if err != nil {
 			return errors.Wrap(err, "invalid exporter-opt")
+		}
+		if solveOpt.Exporter == "local" {
+			solveOpt.ExporterAttrs["output"] = "."
 		}
 		solveOpt.ExporterOutput, solveOpt.ExporterOutputDir, err = resolveExporterOutput(solveOpt.Exporter, solveOpt.ExporterAttrs["output"])
 		if err != nil {
