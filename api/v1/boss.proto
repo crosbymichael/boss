@@ -34,7 +34,7 @@ message GetRequest {
 }
 
 message GetResponse {
-	Container container = 1;
+	ContainerInfo container = 1;
 }
 
 message KillRequest {
@@ -47,10 +47,10 @@ message ListRequest {
 }
 
 message ListResponse {
-	repeated ListContainer containers = 1;
+	repeated ContainerInfo containers = 1;
 }
 
-message ListContainer {
+message ContainerInfo {
 	string id = 1 [(gogoproto.customname) = "ID"];;
 	string image = 2;
 	string status = 3;
@@ -61,6 +61,7 @@ message ListContainer {
 	uint64 pid_usage = 8;
 	uint64 pid_limit = 9;
 	int64 fs_size = 10;
+	Container config = 11;
 }
 
 message RollbackRequest {

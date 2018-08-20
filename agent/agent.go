@@ -136,16 +136,16 @@ func (a *Agent) Get(ctx context.Context, req *v1.GetRequest) (*v1.GetResponse, e
 	if err != nil {
 		return nil, err
 	}
-	config, err := opts.GetConfig(ctx, container)
+	i, err := a.info(ctx, container)
 	if err != nil {
 		return nil, err
 	}
 	return &v1.GetResponse{
-		Container: config,
+		Container: i,
 	}, nil
 }
 
-func (a *Agent) listContainer(ctx context.Context, c containerd.Container) (*v1.ListContainer, error) {
+func (a *Agent) info(ctx context.Context, c containerd.Container) (*v1.ContainerInfo, error) {
 	info, err := c.Info(ctx)
 	if err != nil {
 		return nil, err
@@ -153,7 +153,7 @@ func (a *Agent) listContainer(ctx context.Context, c containerd.Container) (*v1.
 	task, err := c.Task(ctx, nil)
 	if err != nil {
 		if errdefs.IsNotFound(err) {
-			return &v1.ListContainer{
+			return &v1.ContainerInfo{
 				ID:     c.ID(),
 				Image:  info.Image,
 				Status: string(containerd.Stopped),
@@ -193,7 +193,7 @@ func (a *Agent) listContainer(ctx context.Context, c containerd.Container) (*v1.
 	if err != nil {
 		return nil, err
 	}
-	return &v1.ListContainer{
+	return &v1.ContainerInfo{
 		ID:          c.ID(),
 		Image:       info.Image,
 		Status:      string(status.Status),
@@ -204,6 +204,7 @@ func (a *Agent) listContainer(ctx context.Context, c containerd.Container) (*v1.
 		PidUsage:    cg.Pids.Current,
 		PidLimit:    cg.Pids.Limit,
 		FsSize:      usage.Size + bindSizes,
+		Config:      cfg,
 	}, nil
 }
 
@@ -215,9 +216,9 @@ func (a *Agent) List(ctx context.Context, req *v1.ListRequest) (*v1.ListResponse
 		return nil, err
 	}
 	for _, c := range containers {
-		l, err := a.listContainer(ctx, c)
+		l, err := a.info(ctx, c)
 		if err != nil {
-			resp.Containers = append(resp.Containers, &v1.ListContainer{
+			resp.Containers = append(resp.Containers, &v1.ContainerInfo{
 				ID:     c.ID(),
 				Status: "list error",
 			})

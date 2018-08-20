@@ -5,7 +5,7 @@ RUN apk add --no-cache git alpine-sdk make
 ADD . /go/src/github.com/crosbymichael/boss
 WORKDIR /go/src/github.com/crosbymichael/boss
 
-RUN make
+RUN make static
 
 FROM scratch
 
