@@ -10,6 +10,12 @@ import (
 var createCommand = cli.Command{
 	Name:  "create",
 	Usage: "create a container",
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "update",
+			Usage: "create or update",
+		},
+	},
 	Action: func(clix *cli.Context) error {
 		var container Container
 		if _, err := toml.DecodeFile(clix.Args().First(), &container); err != nil {
@@ -22,6 +28,7 @@ var createCommand = cli.Command{
 		defer agent.Close()
 		_, err = agent.Create(Context(), &v1.CreateRequest{
 			Container: container.Proto(),
+			Update:    clix.Bool("update"),
 		})
 		return err
 	},

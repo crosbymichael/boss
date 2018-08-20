@@ -22,6 +22,7 @@ service Agent {
 
 message CreateRequest {
 	Container container = 1;
+	bool update = 2;
 }
 
 message DeleteRequest {

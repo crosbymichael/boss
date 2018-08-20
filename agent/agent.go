@@ -59,6 +59,15 @@ func (a *Agent) Create(ctx context.Context, req *v1.CreateRequest) (*types.Empty
 	if err != nil {
 		return nil, err
 	}
+	if _, err := a.client.LoadContainer(ctx, req.Container.ID); err == nil {
+		if !req.Update {
+			return nil, errors.Errorf("container %s already exists", req.Container.ID)
+		}
+		_, err = a.Update(ctx, &v1.UpdateRequest{
+			Container: req.Container,
+		})
+		return empty, err
+	}
 	container, err := a.client.NewContainer(ctx,
 		req.Container.ID,
 		flux.WithNewSnapshot(image),
