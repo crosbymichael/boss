@@ -17,14 +17,18 @@ type change interface {
 }
 
 type imageUpdateChange struct {
-	ref    string
-	client *containerd.Client
+	ref      string
+	client   *containerd.Client
+	readonly bool
 }
 
 func (c *imageUpdateChange) update(ctx context.Context, container containerd.Container) error {
 	image, err := c.client.Pull(ctx, c.ref, containerd.WithPullUnpack, withPlainRemote(c.ref))
 	if err != nil {
 		return err
+	}
+	if c.readonly {
+		return container.Update(ctx, withImage(image))
 	}
 	return container.Update(ctx, flux.WithUpgrade(image))
 }

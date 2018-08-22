@@ -334,8 +334,9 @@ func (a *Agent) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateRe
 		}
 	}
 	changes = append(changes, &imageUpdateChange{
-		ref:    req.Container.Image,
-		client: a.client,
+		ref:      req.Container.Image,
+		client:   a.client,
+		readonly: current.Readonly,
 	})
 	changes = append(changes, &configChange{
 		client: a.client,
