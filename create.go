@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/BurntSushi/toml"
 	"github.com/crosbymichael/boss/api/v1"
+	"github.com/crosbymichael/boss/cmd"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 )
@@ -17,7 +18,7 @@ var createCommand = cli.Command{
 		},
 	},
 	Action: func(clix *cli.Context) error {
-		var container Container
+		var container cmd.Container
 		if _, err := toml.DecodeFile(clix.Args().First(), &container); err != nil {
 			return err
 		}

@@ -7,6 +7,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/typeurl"
+	"github.com/crosbymichael/boss/cmd"
 	"github.com/crosbymichael/boss/opts"
 	"github.com/crosbymichael/boss/system"
 	"github.com/pkg/errors"
@@ -18,7 +19,7 @@ var migrateCommand = cli.Command{
 	Usage:  "migrate boss < 9 to 12",
 	Hidden: true,
 	Action: func(clix *cli.Context) error {
-		typeurl.Register(&Container{}, "io.boss.v1.Container")
+		typeurl.Register(&cmd.Container{}, "io.boss.v1.Container")
 		ctx := Context()
 		client, err := system.NewClient()
 		if err != nil {
@@ -46,7 +47,7 @@ var migrateCommand = cli.Command{
 	},
 }
 
-func withMigrate(current *Container) func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
+func withMigrate(current *cmd.Container) func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
 	return func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
 		data := current.Proto()
 		any, err := typeurl.MarshalAny(data)
@@ -59,7 +60,7 @@ func withMigrate(current *Container) func(ctx context.Context, client *container
 	}
 }
 
-func loadOldConfig(ctx context.Context, container containerd.Container) (*Container, error) {
+func loadOldConfig(ctx context.Context, container containerd.Container) (*cmd.Container, error) {
 	info, err := container.Info(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "load info")
@@ -69,7 +70,7 @@ func loadOldConfig(ctx context.Context, container containerd.Container) (*Contai
 	if err != nil {
 		return nil, errors.Wrap(err, "unmarshal any")
 	}
-	c, ok := v.(*Container)
+	c, ok := v.(*cmd.Container)
 	if !ok {
 		return nil, errors.New("not old format")
 	}

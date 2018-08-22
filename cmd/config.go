@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import "github.com/crosbymichael/boss/api/v1"
 
