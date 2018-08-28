@@ -158,6 +158,7 @@ message Process {
 	User user = 1;
 	repeated string args = 2;
 	repeated string env = 3;
+	repeated string capabilities = 4;
 }
 
 message User {

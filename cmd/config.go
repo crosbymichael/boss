@@ -3,19 +3,20 @@ package cmd
 import "github.com/crosbymichael/boss/api/v1"
 
 type Container struct {
-	ID        string             `toml:"id"`
-	Image     string             `toml:"image"`
-	Resources *Resources         `toml:"resources"`
-	GPUs      *GPUs              `toml:"gpus"`
-	Mounts    []Mount            `toml:"mounts"`
-	Env       []string           `toml:"env"`
-	Args      []string           `toml:"args"`
-	UID       *int               `toml:"uid"`
-	GID       *int               `toml:"gid"`
-	Network   string             `toml:"network"`
-	Services  map[string]Service `toml:"services"`
-	Configs   map[string]File    `toml:"configs"`
-	Readonly  bool               `toml:"readonly"`
+	ID           string             `toml:"id"`
+	Image        string             `toml:"image"`
+	Resources    *Resources         `toml:"resources"`
+	GPUs         *GPUs              `toml:"gpus"`
+	Mounts       []Mount            `toml:"mounts"`
+	Env          []string           `toml:"env"`
+	Args         []string           `toml:"args"`
+	UID          *int               `toml:"uid"`
+	GID          *int               `toml:"gid"`
+	Network      string             `toml:"network"`
+	Services     map[string]Service `toml:"services"`
+	Configs      map[string]File    `toml:"configs"`
+	Readonly     bool               `toml:"readonly"`
+	Capabilities []string           `toml:"caps"`
 }
 
 func (c *Container) Proto() *v1.Container {
@@ -24,8 +25,9 @@ func (c *Container) Proto() *v1.Container {
 		Image:   c.Image,
 		Network: c.Network,
 		Process: &v1.Process{
-			Args: c.Args,
-			Env:  c.Env,
+			Args:         c.Args,
+			Env:          c.Env,
+			Capabilities: c.Capabilities,
 		},
 		Readonly: c.Readonly,
 		Services: make(map[string]*v1.Service),

@@ -89,7 +89,37 @@ func specOpt(config *v1.Container, image containerd.Image) oci.SpecOpts {
 	if config.Readonly {
 		opts = append(opts, oci.WithRootFSReadonly())
 	}
+	// make sure this opt is run after the user has been set
+	opts = append(opts, withProcessCaps(config.Process.Capabilities))
 	return oci.Compose(opts...)
+}
+
+func withProcessCaps(capabilities []string) oci.SpecOpts {
+	return func(ctx context.Context, _ oci.Client, c *containers.Container, s *oci.Spec) error {
+		set := make(map[string]struct{})
+		for _, s := range s.Process.Capabilities.Bounding {
+			set[s] = struct{}{}
+		}
+		for _, cc := range capabilities {
+			set[cc] = struct{}{}
+		}
+		ss := stringSet(set)
+		s.Process.Capabilities.Bounding = ss
+		s.Process.Capabilities.Effective = ss
+		s.Process.Capabilities.Permitted = ss
+		s.Process.Capabilities.Inheritable = ss
+		if s.Process.User.UID != 0 {
+			s.Process.Capabilities.Ambient = ss
+		}
+		return nil
+	}
+}
+
+func stringSet(set map[string]struct{}) (o []string) {
+	for k := range set {
+		o = append(o, k)
+	}
+	return o
 }
 
 func ints(i []int64) (o []int) {
