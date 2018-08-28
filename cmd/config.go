@@ -2,21 +2,25 @@ package cmd
 
 import "github.com/crosbymichael/boss/api/v1"
 
+const Version = "v1"
+
 type Container struct {
-	ID           string             `toml:"id"`
-	Image        string             `toml:"image"`
-	Resources    *Resources         `toml:"resources"`
-	GPUs         *GPUs              `toml:"gpus"`
-	Mounts       []Mount            `toml:"mounts"`
-	Env          []string           `toml:"env"`
-	Args         []string           `toml:"args"`
-	UID          *int               `toml:"uid"`
-	GID          *int               `toml:"gid"`
-	Network      string             `toml:"network"`
-	Services     map[string]Service `toml:"services"`
-	Configs      map[string]File    `toml:"configs"`
-	Readonly     bool               `toml:"readonly"`
-	Capabilities []string           `toml:"caps"`
+	ConfigVersion string             `toml:"config_version"`
+	ID            string             `toml:"id"`
+	Image         string             `toml:"image"`
+	Resources     *Resources         `toml:"resources"`
+	GPUs          *GPUs              `toml:"gpus"`
+	Mounts        []Mount            `toml:"mounts"`
+	Env           []string           `toml:"env"`
+	Args          []string           `toml:"args"`
+	UID           *int               `toml:"uid"`
+	GID           *int               `toml:"gid"`
+	Network       string             `toml:"network"`
+	Services      map[string]Service `toml:"services"`
+	Configs       map[string]File    `toml:"configs"`
+	Readonly      bool               `toml:"readonly"`
+	Capabilities  []string           `toml:"caps"`
+	Volumes       map[string]Volume  `toml:"volumes"`
 }
 
 func (c *Container) Proto() *v1.Container {
@@ -88,6 +92,13 @@ func (c *Container) Proto() *v1.Container {
 			Content: cfg.Content,
 		}
 	}
+	for id, vol := range c.Volumes {
+		container.Volumes = append(container.Volumes, &v1.Volume{
+			ID:          id,
+			Destination: vol.Destination,
+			Rw:          vol.RW,
+		})
+	}
 	return container
 }
 
@@ -134,4 +145,9 @@ type Mount struct {
 	Source      string   `toml:"source"`
 	Destination string   `toml:"destination"`
 	Options     []string `toml:"options"`
+}
+
+type Volume struct {
+	Destination string `toml:"destination"`
+	RW          bool   `toml:"rw"`
 }

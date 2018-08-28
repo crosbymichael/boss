@@ -5,7 +5,6 @@ import (
 	"github.com/crosbymichael/boss/api/v1"
 	"github.com/crosbymichael/boss/cmd"
 	"github.com/urfave/cli"
-	"google.golang.org/grpc"
 )
 
 var createCommand = cli.Command{
@@ -33,24 +32,4 @@ var createCommand = cli.Command{
 		})
 		return err
 	},
-}
-
-type LocalAgent struct {
-	v1.AgentClient
-	conn *grpc.ClientConn
-}
-
-func (a *LocalAgent) Close() error {
-	return a.conn.Close()
-}
-
-func Agent(clix *cli.Context) (*LocalAgent, error) {
-	conn, err := grpc.Dial(clix.GlobalString("agent"), grpc.WithInsecure())
-	if err != nil {
-		return nil, err
-	}
-	return &LocalAgent{
-		AgentClient: v1.NewAgentClient(conn),
-		conn:        conn,
-	}, nil
 }

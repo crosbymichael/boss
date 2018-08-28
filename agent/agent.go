@@ -73,7 +73,7 @@ func (a *Agent) Create(ctx context.Context, req *v1.CreateRequest) (*types.Empty
 	container, err := a.client.NewContainer(ctx,
 		req.Container.ID,
 		flux.WithNewSnapshot(image),
-		opts.WithBossConfig(req.Container, image),
+		opts.WithBossConfig(a.c.Agent.VolumeRoot, req.Container, image),
 	)
 	if err != nil {
 		return nil, err
@@ -338,8 +338,9 @@ func (a *Agent) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateRe
 		client: a.client,
 	})
 	changes = append(changes, &configChange{
-		client: a.client,
-		c:      req.Container,
+		client:     a.client,
+		c:          req.Container,
+		volumeRoot: a.c.Agent.VolumeRoot,
 	})
 	changes = append(changes, &filesChange{
 		c:     req.Container,

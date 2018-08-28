@@ -112,6 +112,13 @@ message Container {
 	map<string, Service> services = 8;
 	map<string, Config> configs = 9;
 	bool readonly = 10;
+	repeated Volume volumes = 11;
+}
+
+message Volume {
+	string id = 1 [(gogoproto.customname) = "ID"];;
+	string destination = 2;
+	bool rw = 3;
 }
 
 message Config {

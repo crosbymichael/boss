@@ -27,10 +27,10 @@ const (
 )
 
 // WithBossConfig is a containerd.NewContainerOpts for spec and container configuration
-func WithBossConfig(config *v1.Container, image containerd.Image) func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
+func WithBossConfig(volumeRoot string, config *v1.Container, image containerd.Image) func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
 	return func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
 		// generate the spec
-		if err := containerd.WithNewSpec(specOpt(config, image))(ctx, client, c); err != nil {
+		if err := containerd.WithNewSpec(specOpt(volumeRoot, config, image))(ctx, client, c); err != nil {
 			return err
 		}
 		// save the config as a container extension
@@ -52,7 +52,7 @@ func WithRollback(ctx context.Context, client *containerd.Client, c *containers.
 	return nil
 }
 
-func specOpt(config *v1.Container, image containerd.Image) oci.SpecOpts {
+func specOpt(volumeRoot string, config *v1.Container, image containerd.Image) oci.SpecOpts {
 	opts := []oci.SpecOpts{
 		oci.WithImageConfigArgs(image, config.Process.Args),
 		oci.WithHostLocaltime,
@@ -61,6 +61,7 @@ func specOpt(config *v1.Container, image containerd.Image) oci.SpecOpts {
 		seccomp.WithDefaultProfile(),
 		oci.WithEnv(config.Process.Env),
 		withMounts(config.Mounts),
+		withVolumes(volumeRoot, config.Volumes),
 		withConfigs(config.Configs),
 	}
 	if config.Network == "host" {
@@ -201,6 +202,34 @@ func withMounts(mounts []*v1.Mount) oci.SpecOpts {
 				Source:      cm.Source,
 				Destination: cm.Destination,
 				Options:     cm.Options,
+			})
+		}
+		return nil
+	}
+}
+
+func withVolumes(root string, volumes []*v1.Volume) oci.SpecOpts {
+	return func(ctx context.Context, _ oci.Client, c *containers.Container, s *oci.Spec) error {
+		for _, cm := range volumes {
+			if root == "" {
+				return errors.New("no volume_root specified")
+			}
+			source := filepath.Join(root, cm.ID)
+			// create source if it does not exist
+			if err := os.MkdirAll(source, 0755); err != nil {
+				return err
+			}
+			opts := []string{"bind"}
+			if cm.Rw {
+				opts = append(opts, "rw")
+			} else {
+				opts = append(opts, "ro")
+			}
+			s.Mounts = append(s.Mounts, specs.Mount{
+				Type:        "bind",
+				Source:      source,
+				Destination: cm.Destination,
+				Options:     opts,
 			})
 		}
 		return nil
