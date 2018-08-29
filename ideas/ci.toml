@@ -1,0 +1,23 @@
+repo = "github.com/crosbymichael/boss"
+interval = 60
+
+[[steps]]
+	type = "checkout"
+
+[[steps]]
+	type = "build"
+	name = "boss"
+	exporter = "local"
+	artifact = "boss"
+
+[deployment]
+	type = "binary"
+	auto = false
+	servers = ["01", "02"]
+	destination = "/tmp/boss"
+
+	script = '''#!/bin/sh
+chmod +x /tmp/boss
+mv /tmp/boss /usr/local/bin/boss
+sudo systemctl restart boss-agent
+```

@@ -154,8 +154,8 @@ func build(clicontext *cli.Context) error {
 	}
 
 	solveOpt := client.SolveOpt{
-		Exporter: exporter,
-		// ExporterAttrs is set later
+		Exporter:      exporter,
+		ExporterAttrs: make(map[string]string),
 		// LocalDirs is set later
 		Frontend:      "dockerfile.v0",
 		FrontendAttrs: atters,
@@ -165,15 +165,13 @@ func build(clicontext *cli.Context) error {
 	}
 	if !clicontext.Bool("no-export") {
 		name := clicontext.String("name")
-		if name == "" {
-			return errors.New("name is required when exporting")
-		}
-		solveOpt.ExporterAttrs, err = attrMap(fmt.Sprintf("name=%s", name))
-		if err != nil {
-			return errors.Wrap(err, "invalid exporter-opt")
-		}
 		if solveOpt.Exporter == "local" {
 			solveOpt.ExporterAttrs["output"] = "."
+		} else {
+			if name == "" {
+				return errors.New("name is required when exporting")
+			}
+			solveOpt.ExporterAttrs["name"] = name
 		}
 		solveOpt.ExporterOutput, solveOpt.ExporterOutputDir, err = resolveExporterOutput(solveOpt.Exporter, solveOpt.ExporterAttrs["output"])
 		if err != nil {

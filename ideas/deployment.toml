@@ -1,0 +1,5 @@
+
+
+[containers]
+	[containers.redis]
+		node = "node-01"
