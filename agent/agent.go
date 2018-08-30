@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd"
@@ -346,24 +347,49 @@ func (a *Agent) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateRe
 		c:     req.Container,
 		store: a.store,
 	})
+
+	var wait <-chan containerd.ExitStatus
+	// bump the task to pickup the changes
+	task, err := container.Task(ctx, nil)
+	if err != nil {
+		if !errdefs.IsNotFound(err) {
+			return nil, err
+		}
+	}
+	if task != nil {
+		if wait, err = task.Wait(ctx); err != nil {
+			return nil, err
+		}
+	} else {
+		c := make(chan containerd.ExitStatus)
+		wait = c
+		close(c)
+	}
 	err = pauseAndRun(ctx, container, func() error {
 		for _, ch := range changes {
 			if err := ch.update(ctx, container); err != nil {
 				return err
 			}
 		}
-		// bump the task to pickup the changes
-		task, err := container.Task(ctx, nil)
-		if err != nil {
-			if errdefs.IsNotFound(err) {
-				return nil
-			}
-			return err
+		if task == nil {
+			return nil
 		}
 		return task.Kill(ctx, unix.SIGTERM)
 	})
 	if err != nil {
 		return nil, err
+	}
+	wctx, _ := context.WithTimeout(ctx, 10*time.Second)
+	for {
+		select {
+		case <-wctx.Done():
+			if task != nil {
+				return &v1.UpdateResponse{}, task.Kill(ctx, unix.SIGKILL)
+			}
+			return nil, wctx.Err()
+		case <-wait:
+			return &v1.UpdateResponse{}, nil
+		}
 	}
 	return &v1.UpdateResponse{}, nil
 }
