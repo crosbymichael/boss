@@ -1,8 +1,7 @@
-package main
+package api
 
 import (
 	"github.com/crosbymichael/boss/api/v1"
-	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 )
 
@@ -15,8 +14,8 @@ func (a *LocalAgent) Close() error {
 	return a.conn.Close()
 }
 
-func Agent(clix *cli.Context) (*LocalAgent, error) {
-	conn, err := grpc.Dial(clix.GlobalString("agent"), grpc.WithInsecure())
+func Agent(address string) (*LocalAgent, error) {
+	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
 		return nil, err
 	}

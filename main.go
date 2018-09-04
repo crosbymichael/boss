@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/containerd/containerd/namespaces"
+	"github.com/crosbymichael/boss/api"
 	"github.com/crosbymichael/boss/api/v1"
 	"github.com/crosbymichael/boss/version"
 	raven "github.com/getsentry/raven-go"
@@ -89,4 +90,8 @@ run containers like a boss`
 
 func Context() context.Context {
 	return namespaces.WithNamespace(context.Background(), v1.DefaultNamespace)
+}
+
+func Agent(clix *cli.Context) (*api.LocalAgent, error) {
+	return api.Agent(clix.GlobalString("agent"))
 }
