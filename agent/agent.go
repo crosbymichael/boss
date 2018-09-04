@@ -439,10 +439,21 @@ func (a *Agent) Rollback(ctx context.Context, req *v1.RollbackRequest) (*v1.Roll
 }
 
 func (a *Agent) PushBuild(ctx context.Context, req *v1.PushBuildRequest) (*types.Empty, error) {
+	return a.Push(ctx, &v1.PushRequest{
+		Ref:   req.Ref,
+		Build: true,
+	})
+}
+
+func (a *Agent) Push(ctx context.Context, req *v1.PushRequest) (*types.Empty, error) {
 	if req.Ref == "" {
 		return nil, errors.New("no ref provided")
 	}
-	ctx = namespaces.WithNamespace(ctx, "buildkit")
+	if req.Build {
+		ctx = namespaces.WithNamespace(ctx, "buildkit")
+	} else {
+		ctx = relayContext(ctx)
+	}
 	image, err := a.client.GetImage(ctx, req.Ref)
 	if err != nil {
 		return nil, err
@@ -493,14 +504,6 @@ func (a *Agent) Checkpoint(ctx context.Context, req *v1.CheckpointRequest) (*v1.
 	if err != nil {
 		return nil, err
 	}
-	// checkpoint the image that is used from the container
-	image, err := container.Image(ctx)
-	if err != nil {
-		return nil, err
-	}
-	index.Manifests = append(index.Manifests, image.Target())
-	index.Annotations["image.name"] = image.Name()
-	index.Annotations["snapshot.key"] = info.SnapshotKey
 	err = pauseAndRun(ctx, container, func() error {
 		// checkpoint rw layer
 		opts := []diff.Opt{

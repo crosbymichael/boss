@@ -115,8 +115,9 @@ var pushBuildCommand = cli.Command{
 			return err
 		}
 		defer agent.Close()
-		_, err = agent.PushBuild(Context(), &v1.PushBuildRequest{
-			Ref: clix.Args().First(),
+		_, err = agent.Push(Context(), &v1.PushRequest{
+			Ref:   clix.Args().First(),
+			Build: true,
 		})
 		return err
 	},
