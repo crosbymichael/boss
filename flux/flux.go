@@ -33,7 +33,7 @@ func WithNewSnapshot(i containerd.Image) containerd.NewContainerOpts {
 		if c.Snapshotter == "" {
 			c.Snapshotter = containerd.DefaultSnapshotter
 		}
-		r, err := create(ctx, client, i, c.ID, "")
+		r, err := create(ctx, client, i, c, c.ID, "")
 		if err != nil {
 			return err
 		}
@@ -122,7 +122,7 @@ func (r *Revision) Mounts() []mount.Mount {
 	return r.mounts
 }
 
-func create(ctx context.Context, client *containerd.Client, i containerd.Image, id string, previous string) (*Revision, error) {
+func create(ctx context.Context, client *containerd.Client, i containerd.Image, c *containers.Container, id string, previous string) (*Revision, error) {
 	diffIDs, err := i.RootFS(ctx)
 	if err != nil {
 		return nil, err
@@ -139,7 +139,7 @@ func create(ctx context.Context, client *containerd.Client, i containerd.Image, 
 	if previous != "" {
 		labels[PreviousLabel] = previous
 	}
-	mounts, err := client.SnapshotService(containerd.DefaultSnapshotter).Prepare(ctx, r.Key, parent, snapshots.WithLabels(labels))
+	mounts, err := client.SnapshotService(c.Snapshotter).Prepare(ctx, r.Key, parent, snapshots.WithLabels(labels))
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +148,7 @@ func create(ctx context.Context, client *containerd.Client, i containerd.Image, 
 }
 
 func save(ctx context.Context, client *containerd.Client, updatedImage containerd.Image, c *containers.Container) (*Revision, error) {
-	snapshot, err := create(ctx, client, updatedImage, c.ID, c.SnapshotKey)
+	snapshot, err := create(ctx, client, updatedImage, c, c.ID, c.SnapshotKey)
 	if err != nil {
 		return nil, err
 	}
