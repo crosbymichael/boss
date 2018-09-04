@@ -303,6 +303,10 @@ func GetConfig(ctx context.Context, container containerd.Container) (*v1.Contain
 	if err != nil {
 		return nil, err
 	}
+	return GetConfigFromInfo(ctx, info)
+}
+
+func GetConfigFromInfo(ctx context.Context, info containers.Container) (*v1.Container, error) {
 	d := info.Extensions[CurrentConfig]
 	return UnmarshalConfig(&d)
 }

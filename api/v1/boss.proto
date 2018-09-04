@@ -115,9 +115,8 @@ message CheckpointResponse {
 }
 
 message RestoreRequest {
-	string id = 1 [(gogoproto.customname) = "ID"];;
-	string ref = 2;
-	bool live = 3;
+	string ref = 1;
+	bool live = 2;
 }
 
 message RestoreResponse {

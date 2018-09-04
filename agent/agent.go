@@ -16,6 +16,7 @@ import (
 	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd"
 	tasks "github.com/containerd/containerd/api/services/tasks/v1"
+	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
@@ -120,7 +121,6 @@ func (a *Agent) Delete(ctx context.Context, req *v1.DeleteRequest) (*types.Empty
 		return nil, errors.Wrap(err, "load container")
 	}
 	if err := systemd.Stop(ctx, id); err != nil {
-		return nil, err
 		return nil, errors.Wrap(err, "stop service")
 	}
 	if err := systemd.Disable(ctx, id); err != nil {
@@ -559,11 +559,97 @@ func (a *Agent) Checkpoint(ctx context.Context, req *v1.CheckpointRequest) (*v1.
 	if _, err := a.client.ImageService().Create(ctx, i); err != nil {
 		return nil, err
 	}
+	if req.Exit {
+		if err := systemd.Stop(ctx, req.ID); err != nil {
+			return nil, errors.Wrap(err, "stop service")
+		}
+	}
 	return &v1.CheckpointResponse{}, nil
 }
 
 func (a *Agent) Restore(ctx context.Context, req *v1.RestoreRequest) (*v1.RestoreResponse, error) {
-	return nil, nil
+	ctx = relayContext(ctx)
+	checkpoint, err := a.client.GetImage(ctx, req.Ref)
+	if err != nil {
+		if !errdefs.IsNotFound(err) {
+			return nil, err
+		}
+		if checkpoint, err = a.client.Pull(ctx, req.Ref, withPlainRemote(req.Ref)); err != nil {
+			return nil, err
+		}
+	}
+
+	store := a.client.ContentStore()
+	index, err := decodeIndex(ctx, store, checkpoint.Target())
+	if err != nil {
+		return nil, err
+	}
+	configDesc, err := getByMediaType(index, MediaTypeContainerInfo)
+	if err != nil {
+		return nil, err
+	}
+	data, err := content.ReadBlob(ctx, store, *configDesc)
+	if err != nil {
+		return nil, err
+	}
+	var c containers.Container
+	if err := json.Unmarshal(data, &c); err != nil {
+		return nil, err
+	}
+	config, err := opts.GetConfigFromInfo(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+	image, err := a.client.Pull(ctx, config.Image, containerd.WithPullUnpack, withPlainRemote(config.Image))
+	if err != nil {
+		return nil, err
+	}
+	container, err := a.client.NewContainer(ctx,
+		config.ID,
+		flux.WithNewSnapshot(image),
+		opts.WithBossConfig(a.c.Agent.VolumeRoot, config, image),
+	)
+	if err != nil {
+		return nil, err
+	}
+	// apply rw layer
+	info, err := container.Info(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rw, err := getByMediaType(index, is.MediaTypeImageLayerGzip)
+	if err != nil {
+		return nil, err
+	}
+	mounts, err := a.client.SnapshotService(info.Snapshotter).Mounts(ctx, info.SnapshotKey)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := a.client.DiffService().Apply(ctx, *rw, mounts); err != nil {
+		return nil, err
+	}
+	if err := a.store.Write(ctx, config); err != nil {
+		container.Delete(ctx, containerd.WithSnapshotCleanup)
+		return nil, err
+	}
+	if err := systemd.Enable(ctx, container.ID()); err != nil {
+		return nil, err
+	}
+	if err := systemd.Start(ctx, container.ID()); err != nil {
+		return nil, err
+	}
+	return &v1.RestoreResponse{}, nil
+}
+
+var errMediaTypeNotFound = errors.New("media type not found in index")
+
+func getByMediaType(index *is.Index, mt string) (*is.Descriptor, error) {
+	for _, d := range index.Manifests {
+		if d.MediaType == mt {
+			return &d, nil
+		}
+	}
+	return nil, errMediaTypeNotFound
 }
 
 func withPlainRemote(ref string) containerd.RemoteOpt {
@@ -645,4 +731,16 @@ func writeContent(ctx context.Context, store content.Ingester, mediaType, ref st
 		Digest:    writer.Digest(),
 		Size:      size,
 	}, nil
+}
+
+func decodeIndex(ctx context.Context, store content.Provider, desc is.Descriptor) (*is.Index, error) {
+	var index is.Index
+	p, err := content.ReadBlob(ctx, store, desc)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(p, &index); err != nil {
+		return nil, err
+	}
+	return &index, nil
 }
