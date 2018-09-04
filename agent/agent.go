@@ -1,18 +1,29 @@
 package agent
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/containerd/cgroups"
 	"github.com/containerd/containerd"
+	tasks "github.com/containerd/containerd/api/services/tasks/v1"
+	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/remotes/docker"
+	"github.com/containerd/containerd/rootfs"
+	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/typeurl"
 	"github.com/crosbymichael/boss/api/v1"
@@ -21,6 +32,8 @@ import (
 	"github.com/crosbymichael/boss/opts"
 	"github.com/crosbymichael/boss/systemd"
 	"github.com/gogo/protobuf/types"
+	ver "github.com/opencontainers/image-spec/specs-go"
+	is "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
@@ -31,6 +44,10 @@ var (
 	plainRemotes = make(map[string]bool)
 
 	empty = &types.Empty{}
+)
+
+const (
+	MediaTypeContainerInfo = "application/vnd.boss.container.info.v1+json"
 )
 
 func New(c *config.Config, client *containerd.Client, store config.ConfigStore) (*Agent, error) {
@@ -433,6 +450,122 @@ func (a *Agent) PushBuild(ctx context.Context, req *v1.PushBuildRequest) (*types
 	return empty, a.client.Push(ctx, req.Ref, image.Target(), withPlainRemote(req.Ref))
 }
 
+func (a *Agent) Checkpoint(ctx context.Context, req *v1.CheckpointRequest) (*v1.CheckpointResponse, error) {
+	ctx = relayContext(ctx)
+	ctx, done, err := a.client.WithLease(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer done(ctx)
+	container, err := a.client.LoadContainer(ctx, req.ID)
+	if err != nil {
+		return nil, err
+	}
+	info, err := container.Info(ctx)
+	if err != nil {
+		return nil, err
+	}
+	index := is.Index{
+		Versioned: ver.Versioned{
+			SchemaVersion: 2,
+		},
+		Annotations: make(map[string]string),
+	}
+	data, err := json.Marshal(info)
+	if err != nil {
+		return nil, err
+	}
+	r := bytes.NewReader(data)
+	desc, err := writeContent(ctx, a.client.ContentStore(), MediaTypeContainerInfo, req.ID+"-container-info", r)
+	if err != nil {
+		return nil, err
+	}
+	desc.Platform = &is.Platform{
+		OS:           runtime.GOOS,
+		Architecture: runtime.GOARCH,
+	}
+	index.Manifests = append(index.Manifests, desc)
+
+	opts := options.CheckpointOptions{
+		Exit: req.Exit,
+	}
+	any, err := typeurl.MarshalAny(&opts)
+	if err != nil {
+		return nil, err
+	}
+	// checkpoint the image that is used from the container
+	image, err := container.Image(ctx)
+	if err != nil {
+		return nil, err
+	}
+	index.Manifests = append(index.Manifests, image.Target())
+	index.Annotations["image.name"] = image.Name()
+	index.Annotations["snapshot.key"] = info.SnapshotKey
+	err = pauseAndRun(ctx, container, func() error {
+		// checkpoint rw layer
+		opts := []diff.Opt{
+			diff.WithReference(fmt.Sprintf("checkpoint-rw-%s", info.SnapshotKey)),
+		}
+		rw, err := rootfs.CreateDiff(ctx,
+			info.SnapshotKey,
+			a.client.SnapshotService(info.Snapshotter),
+			a.client.DiffService(),
+			opts...,
+		)
+		if err != nil {
+			return err
+		}
+		rw.Platform = &is.Platform{
+			OS:           runtime.GOOS,
+			Architecture: runtime.GOARCH,
+		}
+		index.Manifests = append(index.Manifests, rw)
+		if req.Live {
+			task, err := a.client.TaskService().Checkpoint(ctx, &tasks.CheckpointTaskRequest{
+				ContainerID: req.ID,
+				Options:     any,
+			})
+			if err != nil {
+				return err
+			}
+			for _, d := range task.Descriptors {
+				if d.MediaType == images.MediaTypeContainerd1CheckpointConfig {
+					// we will save the entire container config to the checkpoint instead
+					continue
+				}
+				index.Manifests = append(index.Manifests, is.Descriptor{
+					MediaType: d.MediaType,
+					Size:      d.Size_,
+					Digest:    d.Digest,
+					Platform: &is.Platform{
+						OS:           runtime.GOOS,
+						Architecture: runtime.GOARCH,
+					},
+				})
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if desc, err = a.writeIndex(ctx, &index, req.Ref); err != nil {
+		return nil, err
+	}
+	i := images.Image{
+		Name:   req.Ref,
+		Target: desc,
+	}
+	if _, err := a.client.ImageService().Create(ctx, i); err != nil {
+		return nil, err
+	}
+	return &v1.CheckpointResponse{}, nil
+}
+
+func (a *Agent) Restore(ctx context.Context, req *v1.RestoreRequest) (*v1.RestoreResponse, error) {
+	return nil, nil
+}
+
 func withPlainRemote(ref string) containerd.RemoteOpt {
 	remote := strings.SplitN(ref, "/", 2)[0]
 	return func(_ *containerd.Client, ctx *containerd.RemoteContext) error {
@@ -480,4 +613,36 @@ func getBindSizes(c *v1.Container) (size int64, _ error) {
 
 func relayContext(ctx context.Context) context.Context {
 	return namespaces.WithNamespace(ctx, v1.DefaultNamespace)
+}
+
+func (a *Agent) writeIndex(ctx context.Context, index *is.Index, ref string) (d is.Descriptor, err error) {
+	labels := map[string]string{}
+	for i, m := range index.Manifests {
+		labels[fmt.Sprintf("containerd.io/gc.ref.content.%d", i)] = m.Digest.String()
+	}
+	buf := bytes.NewBuffer(nil)
+	if err := json.NewEncoder(buf).Encode(index); err != nil {
+		return is.Descriptor{}, err
+	}
+	return writeContent(ctx, a.client.ContentStore(), is.MediaTypeImageIndex, ref, buf, content.WithLabels(labels))
+}
+
+func writeContent(ctx context.Context, store content.Ingester, mediaType, ref string, r io.Reader, opts ...content.Opt) (d is.Descriptor, err error) {
+	writer, err := store.Writer(ctx, content.WithRef(ref))
+	if err != nil {
+		return d, err
+	}
+	defer writer.Close()
+	size, err := io.Copy(writer, r)
+	if err != nil {
+		return d, err
+	}
+	if err := writer.Commit(ctx, size, "", opts...); err != nil {
+		return d, err
+	}
+	return is.Descriptor{
+		MediaType: mediaType,
+		Digest:    writer.Digest(),
+		Size:      size,
+	}, nil
 }

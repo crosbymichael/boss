@@ -19,6 +19,8 @@ service Agent {
 	rpc Stop(StopRequest) returns (google.protobuf.Empty);
 	rpc Update(UpdateRequest) returns (UpdateResponse);
 	rpc PushBuild(PushBuildRequest) returns (google.protobuf.Empty);
+	rpc Checkpoint(CheckpointRequest) returns (CheckpointResponse);
+	rpc Restore(RestoreRequest) returns (RestoreResponse);
 }
 
 message CreateRequest {
@@ -99,6 +101,26 @@ message UpdateResponse {
 
 message PushBuildRequest {
 	string ref = 1;
+}
+
+message CheckpointRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];;
+	string ref = 2;
+	bool live = 3;
+	bool exit = 4;
+}
+
+message CheckpointResponse {
+
+}
+
+message RestoreRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];;
+	string ref = 2;
+	bool live = 3;
+}
+
+message RestoreResponse {
 }
 
 message Container {

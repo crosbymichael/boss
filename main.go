@@ -67,6 +67,7 @@ run containers like a boss`
 	app.Commands = []cli.Command{
 		agentCommand,
 		buildCommand,
+		checkpointCommand,
 		createCommand,
 		deleteCommand,
 		getCommand,
