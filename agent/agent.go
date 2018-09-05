@@ -554,7 +554,7 @@ func (a *Agent) Checkpoint(ctx context.Context, req *v1.CheckpointRequest) (*v1.
 	if err != nil {
 		return nil, err
 	}
-	if desc, err = a.writeIndex(ctx, &index, req.ID); err != nil {
+	if desc, err = a.writeIndex(ctx, &index, req.ID+"index"); err != nil {
 		return nil, err
 	}
 	i := images.Image{
@@ -711,11 +711,11 @@ func (a *Agent) writeIndex(ctx context.Context, index *is.Index, ref string) (d 
 	for i, m := range index.Manifests {
 		labels[fmt.Sprintf("containerd.io/gc.ref.content.%d", i)] = m.Digest.String()
 	}
-	buf := bytes.NewBuffer(nil)
-	if err := json.NewEncoder(buf).Encode(index); err != nil {
+	data, err := json.Marshal(index)
+	if err != nil {
 		return is.Descriptor{}, err
 	}
-	return writeContent(ctx, a.client.ContentStore(), is.MediaTypeImageIndex, ref, buf, content.WithLabels(labels))
+	return writeContent(ctx, a.client.ContentStore(), is.MediaTypeImageIndex, ref, bytes.NewReader(data), content.WithLabels(labels))
 }
 
 func writeContent(ctx context.Context, store content.Ingester, mediaType, ref string, r io.Reader, opts ...content.Opt) (d is.Descriptor, err error) {
