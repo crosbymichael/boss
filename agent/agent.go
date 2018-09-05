@@ -552,7 +552,7 @@ func (a *Agent) Checkpoint(ctx context.Context, req *v1.CheckpointRequest) (*v1.
 	if err != nil {
 		return nil, err
 	}
-	if desc, err = a.writeIndex(ctx, &index, req.Ref); err != nil {
+	if desc, err = a.writeIndex(ctx, &index, req.ID); err != nil {
 		return nil, err
 	}
 	i := images.Image{
