@@ -114,6 +114,10 @@ var systemdExecStartCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+		desc, err := opts.GetRestoreDesc(ctx, container)
+		if err != nil {
+			return err
+		}
 		cfg, err := opts.GetConfig(ctx, container)
 		if err != nil {
 			return err
@@ -138,12 +142,10 @@ var systemdExecStartCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		if ip != "" {
-			if err := container.Update(ctx, opts.WithIP(ip)); err != nil {
-				return err
-			}
+		if err := container.Update(ctx, opts.WithIP(ip), opts.WithoutRestore); err != nil {
+			return err
 		}
-		task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStdio))
+		task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStdio), opts.WithTaskRestore(desc))
 		if err != nil {
 			return err
 		}

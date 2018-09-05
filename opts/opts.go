@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd"
+	api "github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/contrib/nvidia"
@@ -17,13 +18,15 @@ import (
 	"github.com/containerd/typeurl"
 	"github.com/crosbymichael/boss/api/v1"
 	"github.com/gogo/protobuf/types"
+	is "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 const (
-	CurrentConfig = "io.boss/container"
-	LastConfig    = "io.boss/container.last"
-	IPLabel       = "io/boss/container.ip"
+	CurrentConfig          = "io.boss/container"
+	LastConfig             = "io.boss/container.last"
+	IPLabel                = "io/boss/container.ip"
+	RestoreCheckpointLabel = "io/boss/restore.checkpoint"
 )
 
 // WithBossConfig is a containerd.NewContainerOpts for spec and container configuration
@@ -334,4 +337,54 @@ func WithIP(ip string) containerd.UpdateContainerOpts {
 		c.Labels[IPLabel] = ip
 		return nil
 	}
+}
+
+func WithRestore(m *is.Descriptor) containerd.NewContainerOpts {
+	return func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
+		if c.Extensions == nil {
+			c.Extensions = make(map[string]types.Any)
+		}
+		v := &api.Descriptor{
+			MediaType: m.MediaType,
+			Size_:     m.Size,
+			Digest:    m.Digest,
+		}
+		any, err := typeurl.MarshalAny(v)
+		if err != nil {
+			return err
+		}
+		c.Extensions[RestoreCheckpointLabel] = *any
+		return nil
+	}
+}
+
+func WithoutRestore(ctx context.Context, client *containerd.Client, c *containers.Container) error {
+	if c.Extensions == nil {
+		c.Extensions = make(map[string]types.Any)
+	}
+	delete(c.Extensions, RestoreCheckpointLabel)
+	return nil
+}
+
+func WithTaskRestore(desc *api.Descriptor) containerd.NewTaskOpts {
+	return func(ctx context.Context, client *containerd.Client, ti *containerd.TaskInfo) error {
+		ti.Checkpoint = desc
+		return nil
+	}
+}
+
+func GetRestoreDesc(ctx context.Context, c containerd.Container) (*api.Descriptor, error) {
+	ex, err := c.Extensions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	any, ok := ex[RestoreCheckpointLabel]
+	if !ok {
+		return nil, nil
+	}
+	v, err := typeurl.UnmarshalAny(&any)
+	if err != nil {
+		return nil, err
+	}
+	return v.(*api.Descriptor), nil
 }

@@ -496,10 +496,14 @@ func (a *Agent) Checkpoint(ctx context.Context, req *v1.CheckpointRequest) (*v1.
 		Architecture: runtime.GOARCH,
 	}
 	index.Manifests = append(index.Manifests, desc)
-	index.Annotations["image.name"] = info.Image
 
 	opts := options.CheckpointOptions{
-		Exit: req.Exit,
+		Exit:                req.Exit,
+		OpenTcp:             false,
+		ExternalUnixSockets: false,
+		Terminal:            false,
+		FileLocks:           true,
+		EmptyNamespaces:     nil,
 	}
 	any, err := typeurl.MarshalAny(&opts)
 	if err != nil {
@@ -509,7 +513,6 @@ func (a *Agent) Checkpoint(ctx context.Context, req *v1.CheckpointRequest) (*v1.
 		// checkpoint rw layer
 		opts := []diff.Opt{
 			diff.WithReference(fmt.Sprintf("checkpoint-rw-%s", info.SnapshotKey)),
-			diff.WithMediaType(is.MediaTypeImageLayer),
 		}
 		rw, err := rootfs.CreateDiff(ctx,
 			info.SnapshotKey,
@@ -579,11 +582,12 @@ func (a *Agent) Restore(ctx context.Context, req *v1.RestoreRequest) (*v1.Restor
 		if !errdefs.IsNotFound(err) {
 			return nil, err
 		}
-		if checkpoint, err = a.client.Pull(ctx, req.Ref, withPlainRemote(req.Ref)); err != nil {
+		ck, err := a.client.Fetch(ctx, req.Ref, withPlainRemote(req.Ref))
+		if err != nil {
 			return nil, err
 		}
+		checkpoint = containerd.NewImage(a.client, ck)
 	}
-
 	store := a.client.ContentStore()
 	index, err := decodeIndex(ctx, store, checkpoint.Target())
 	if err != nil {
@@ -609,10 +613,20 @@ func (a *Agent) Restore(ctx context.Context, req *v1.RestoreRequest) (*v1.Restor
 	if err != nil {
 		return nil, err
 	}
-	container, err := a.client.NewContainer(ctx,
-		config.ID,
+	o := []containerd.NewContainerOpts{
 		flux.WithNewSnapshot(image),
 		opts.WithBossConfig(a.c.Agent.VolumeRoot, config, image),
+	}
+	if req.Live {
+		desc, err := getByMediaType(index, images.MediaTypeContainerd1Checkpoint)
+		if err != nil {
+			return nil, err
+		}
+		o = append(o, opts.WithRestore(desc))
+	}
+	container, err := a.client.NewContainer(ctx,
+		config.ID,
+		o...,
 	)
 	if err != nil {
 		return nil, err
@@ -622,7 +636,7 @@ func (a *Agent) Restore(ctx context.Context, req *v1.RestoreRequest) (*v1.Restor
 	if err != nil {
 		return nil, err
 	}
-	rw, err := getByMediaType(index, is.MediaTypeImageLayer)
+	rw, err := getByMediaType(index, is.MediaTypeImageLayerGzip)
 	if err != nil {
 		return nil, err
 	}
