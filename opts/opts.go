@@ -217,7 +217,7 @@ func withVolumes(root string, volumes []*v1.Volume) oci.SpecOpts {
 			if root == "" {
 				return errors.New("no volume_root specified")
 			}
-			source := filepath.Join(root, "containers", cm.ID)
+			source := filepath.Join(root, cm.ID)
 			// create source if it does not exist
 			if err := os.MkdirAll(source, 0755); err != nil {
 				return err
