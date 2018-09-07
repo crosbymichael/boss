@@ -187,17 +187,8 @@ func withMounts(mounts []*v1.Mount) oci.SpecOpts {
 		for _, cm := range mounts {
 			if cm.Type == "bind" {
 				// create source if it does not exist
-				if err := os.MkdirAll(filepath.Dir(cm.Source), 0755); err != nil {
+				if err := createHostDir(cm.Source, int(s.Process.User.UID), int(s.Process.User.GID)); err != nil {
 					return err
-				}
-				if err := os.Mkdir(cm.Source, 0755); err != nil {
-					if !os.IsExist(err) {
-						return err
-					}
-				} else {
-					if err := os.Chown(cm.Source, int(s.Process.User.UID), int(s.Process.User.GID)); err != nil {
-						return err
-					}
 				}
 			}
 			s.Mounts = append(s.Mounts, specs.Mount{
@@ -211,6 +202,22 @@ func withMounts(mounts []*v1.Mount) oci.SpecOpts {
 	}
 }
 
+func createHostDir(path string, uid, gid int) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+	if err := os.Mkdir(path, 0755); err != nil {
+		if os.IsExist(err) {
+			return nil
+		}
+		return err
+	}
+	if err := os.Chown(path, uid, gid); err != nil {
+		return err
+	}
+	return nil
+}
+
 func withVolumes(root string, volumes []*v1.Volume) oci.SpecOpts {
 	return func(ctx context.Context, _ oci.Client, c *containers.Container, s *oci.Spec) error {
 		for _, cm := range volumes {
@@ -218,8 +225,7 @@ func withVolumes(root string, volumes []*v1.Volume) oci.SpecOpts {
 				return errors.New("no volume_root specified")
 			}
 			source := filepath.Join(root, cm.ID)
-			// create source if it does not exist
-			if err := os.MkdirAll(source, 0755); err != nil {
+			if err := createHostDir(source, int(s.Process.User.UID), int(s.Process.User.GID)); err != nil {
 				return err
 			}
 			opts := []string{"bind"}
