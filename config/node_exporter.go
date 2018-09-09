@@ -22,7 +22,7 @@ type NodeExporter struct {
 }
 
 func (s *NodeExporter) Name() string {
-	return "node_exporter"
+	return "node-exporter"
 }
 
 func (s *NodeExporter) Run(ctx context.Context, client *containerd.Client, clix *cli.Context) error {

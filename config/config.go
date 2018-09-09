@@ -62,7 +62,7 @@ type Config struct {
 	Buildkit     *Buildkit     `toml:"buildkit"`
 	CNI          *CNI          `toml:"cni"`
 	Consul       *Consul       `toml:"consul"`
-	NodeExporter *NodeExporter `toml:"node_exporter"`
+	NodeExporter *NodeExporter `toml:"nodeexporter"`
 	Nameservers  []string      `toml:"nameservers"`
 	Timezone     string        `toml:"timezone"`
 	MOTD         *MOTD         `toml:"motd"`
