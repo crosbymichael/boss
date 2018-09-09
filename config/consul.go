@@ -18,7 +18,7 @@ Description=consul.io
 After=network.target
 
 [Service]
-ExecStart=/opt/containerd/bin/consul agent {{.Bootstrap}} -server -data-dir=/var/lib/consul -datacenter {{.Domain}} -node {{.ID}} -ui -bind {{.IP}} -client "127.0.0.1 {{.IP}}" -domain {{.Domain}} -recursor 8.8.8.8 -recursor 8.8.4.4 -dns-port 53
+ExecStart=/opt/containerd/bin/consul agent {{.Bootstrap}} {{.Server}} -data-dir=/var/lib/consul -datacenter {{.Domain}} -node {{.ID}} -ui -bind {{.IP}} -client "127.0.0.1 {{.IP}}" -domain {{.Domain}} -recursor 8.8.8.8 -recursor 8.8.4.4 -dns-port 53
 Restart=always
 RestartSec=5
 
@@ -26,9 +26,10 @@ RestartSec=5
 WantedBy=multi-user.target`
 
 type Consul struct {
-	Image string   `toml:"image"`
-	Join  []string `toml:"join"`
-	c     *Config
+	Image    string   `toml:"image"`
+	Join     []string `toml:"join"`
+	NoServer bool     `toml:"no_server"`
+	c        *Config
 }
 
 func (s *Consul) SubSteps() (o []Step) {
@@ -71,6 +72,7 @@ func (s *Consul) Run(ctx context.Context, client *containerd.Client, clix *cli.C
 		Domain    string
 		ID        string
 		IP        string
+		Server    string
 	}{
 		ID:     s.c.ID,
 		Domain: s.c.Domain,
@@ -78,6 +80,9 @@ func (s *Consul) Run(ctx context.Context, client *containerd.Client, clix *cli.C
 	}
 	if len(s.Join) == 0 {
 		tmplCtx.Bootstrap = "-bootstrap"
+	}
+	if !s.NoServer {
+		tmplCtx.Server = "-server"
 	}
 	t, err := template.New("consul").Parse(consulUnit)
 	if err != nil {

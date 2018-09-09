@@ -69,6 +69,7 @@ type Config struct {
 	SSH          *SSH          `toml:"ssh"`
 	Agent        Agent         `toml:"agent"`
 	Containerd   Containerd    `toml:"containerd"`
+	Criu         *Criu         `toml:"criu"`
 }
 
 func (c *Config) Store() (ConfigStore, error) {
