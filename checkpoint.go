@@ -21,6 +21,10 @@ var checkpointCommand = cli.Command{
 			Name:  "ref",
 			Usage: "ref name of the created checkpoint",
 		},
+		cli.BoolFlag{
+			Name:  "push",
+			Usage: "push the successful checkpoint",
+		},
 	},
 	Action: func(clix *cli.Context) error {
 		ctx := Context()
@@ -29,12 +33,21 @@ var checkpointCommand = cli.Command{
 			return err
 		}
 		defer agent.Close()
-		_, err = agent.Checkpoint(ctx, &v1.CheckpointRequest{
+		ref := clix.String("ref")
+		if _, err := agent.Checkpoint(ctx, &v1.CheckpointRequest{
 			ID:   clix.Args().First(),
-			Ref:  clix.String("ref"),
+			Ref:  ref,
 			Live: clix.Bool("live"),
 			Exit: clix.Bool("exit"),
-		})
-		return err
+		}); err != nil {
+			return err
+		}
+		if clix.Bool("push") {
+			_, err = agent.Push(ctx, &v1.PushRequest{
+				Ref: ref,
+			})
+			return err
+		}
+		return nil
 	},
 }
