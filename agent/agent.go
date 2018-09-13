@@ -43,6 +43,7 @@ import (
 
 var (
 	ErrNoID      = errors.New("no id provided")
+	ErrNoRef     = errors.New("no ref provided")
 	plainRemotes = make(map[string]bool)
 
 	empty = &types.Empty{}
@@ -414,6 +415,9 @@ func (a *Agent) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateRe
 
 func (a *Agent) Rollback(ctx context.Context, req *v1.RollbackRequest) (*v1.RollbackResponse, error) {
 	ctx = relayContext(ctx)
+	if req.ID == "" {
+		return nil, ErrNoID
+	}
 	ctx, done, err := a.client.WithLease(ctx)
 	if err != nil {
 		return nil, err
@@ -440,6 +444,9 @@ func (a *Agent) Rollback(ctx context.Context, req *v1.RollbackRequest) (*v1.Roll
 }
 
 func (a *Agent) PushBuild(ctx context.Context, req *v1.PushBuildRequest) (*types.Empty, error) {
+	if req.Ref == "" {
+		return nil, ErrNoRef
+	}
 	return a.Push(ctx, &v1.PushRequest{
 		Ref:   req.Ref,
 		Build: true,
@@ -448,7 +455,7 @@ func (a *Agent) PushBuild(ctx context.Context, req *v1.PushBuildRequest) (*types
 
 func (a *Agent) Push(ctx context.Context, req *v1.PushRequest) (*types.Empty, error) {
 	if req.Ref == "" {
-		return nil, errors.New("no ref provided")
+		return nil, ErrNoRef
 	}
 	if req.Build {
 		ctx = namespaces.WithNamespace(ctx, "buildkit")
@@ -464,6 +471,9 @@ func (a *Agent) Push(ctx context.Context, req *v1.PushRequest) (*types.Empty, er
 
 func (a *Agent) Checkpoint(ctx context.Context, req *v1.CheckpointRequest) (*v1.CheckpointResponse, error) {
 	ctx = relayContext(ctx)
+	if req.ID == "" {
+		return nil, ErrNoID
+	}
 	ctx, done, err := a.client.WithLease(ctx)
 	if err != nil {
 		return nil, err
@@ -578,6 +588,9 @@ func (a *Agent) Checkpoint(ctx context.Context, req *v1.CheckpointRequest) (*v1.
 
 func (a *Agent) Restore(ctx context.Context, req *v1.RestoreRequest) (*v1.RestoreResponse, error) {
 	ctx = relayContext(ctx)
+	if req.Ref == "" {
+		return nil, ErrNoRef
+	}
 	checkpoint, err := a.client.GetImage(ctx, req.Ref)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
@@ -663,6 +676,9 @@ func (a *Agent) Restore(ctx context.Context, req *v1.RestoreRequest) (*v1.Restor
 
 func (a *Agent) Migrate(ctx context.Context, req *v1.MigrateRequest) (*v1.MigrateResponse, error) {
 	ctx = relayContext(ctx)
+	if req.ID == "" {
+		return nil, ErrNoID
+	}
 	to, err := api.Agent(req.To)
 	if err != nil {
 		return nil, err
