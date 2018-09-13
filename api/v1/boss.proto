@@ -22,6 +22,7 @@ service Agent {
 	rpc Push(PushRequest) returns (google.protobuf.Empty);
 	rpc Checkpoint(CheckpointRequest) returns (CheckpointResponse);
 	rpc Restore(RestoreRequest) returns (RestoreResponse);
+	rpc Migrate(MigrateRequest) returns (MigrateResponse);
 }
 
 message CreateRequest {
@@ -127,6 +128,18 @@ message RestoreRequest {
 }
 
 message RestoreResponse {
+}
+
+message MigrateRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];;
+	string ref = 2;
+	bool live = 3;
+	bool stop = 4;
+	string to = 5;
+	bool delete = 6;
+}
+
+message MigrateResponse {
 }
 
 message Container {

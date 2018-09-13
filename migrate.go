@@ -1,78 +1,52 @@
 package main
 
 import (
-	"context"
-	"fmt"
-
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/containers"
-	"github.com/containerd/typeurl"
-	"github.com/crosbymichael/boss/cmd"
-	"github.com/crosbymichael/boss/opts"
-	"github.com/crosbymichael/boss/system"
-	"github.com/pkg/errors"
+	"github.com/crosbymichael/boss/api/v1"
 	"github.com/urfave/cli"
 )
 
 var migrateCommand = cli.Command{
-	Name:   "migrate",
-	Usage:  "migrate boss < 9 to 12",
-	Hidden: true,
-	Action: func(clix *cli.Context) error {
-		typeurl.Register(&cmd.Container{}, "io.boss.v1.Container")
-		ctx := Context()
-		client, err := system.NewClient()
-		if err != nil {
-			return err
-		}
-		defer client.Close()
-		containers, err := client.Containers(ctx)
-		if err != nil {
-			return err
-		}
-		for _, c := range containers {
-			if _, err := opts.GetConfig(ctx, c); err == nil {
-				continue
-			}
-			fmt.Println("migrating", c.ID())
-			current, err := loadOldConfig(ctx, c)
-			if err != nil {
-				return errors.Wrap(err, "load old config")
-			}
-			if err := c.Update(ctx, withMigrate(current)); err != nil {
-				return errors.Wrap(err, "migrate")
-			}
-		}
-		return nil
+	Name:  "migrate",
+	Usage: "migrate a container from one agent to another",
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "live",
+			Usage: "enable live checkpoint(criu must be installed)",
+		},
+		cli.BoolFlag{
+			Name:  "stop",
+			Usage: "stop the container after a successful checkpoint",
+		},
+		cli.BoolFlag{
+			Name:  "delete",
+			Usage: "delete the container on the local agent after a successful checkpoint",
+		},
+
+		cli.StringFlag{
+			Name:  "ref",
+			Usage: "ref name of the created checkpoint",
+		},
+		cli.StringFlag{
+			Name:  "to",
+			Usage: "destination agent",
+		},
 	},
-}
 
-func withMigrate(current *cmd.Container) func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
-	return func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
-		data := current.Proto()
-		any, err := typeurl.MarshalAny(data)
+	Action: func(clix *cli.Context) error {
+		ctx := Context()
+		agent, err := Agent(clix)
 		if err != nil {
 			return err
 		}
-		c.Extensions[opts.LastConfig] = *any
-		c.Extensions[opts.CurrentConfig] = *any
-		return nil
-	}
-}
-
-func loadOldConfig(ctx context.Context, container containerd.Container) (*cmd.Container, error) {
-	info, err := container.Info(ctx)
-	if err != nil {
-		return nil, errors.Wrap(err, "load info")
-	}
-	d := info.Extensions[opts.CurrentConfig]
-	v, err := typeurl.UnmarshalAny(&d)
-	if err != nil {
-		return nil, errors.Wrap(err, "unmarshal any")
-	}
-	c, ok := v.(*cmd.Container)
-	if !ok {
-		return nil, errors.New("not old format")
-	}
-	return c, nil
+		defer agent.Close()
+		_, err = agent.Migrate(ctx, &v1.MigrateRequest{
+			ID:     clix.Args().First(),
+			Ref:    clix.String("ref"),
+			Stop:   clix.Bool("stop"),
+			Delete: clix.Bool("delete"),
+			To:     clix.String("to"),
+			Live:   clix.Bool("live"),
+		})
+		return err
+	},
 }

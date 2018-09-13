@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/typeurl"
+	"github.com/crosbymichael/boss/api"
 	"github.com/crosbymichael/boss/api/v1"
 	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/flux"
@@ -660,7 +661,52 @@ func (a *Agent) Restore(ctx context.Context, req *v1.RestoreRequest) (*v1.Restor
 	return &v1.RestoreResponse{}, nil
 }
 
-var errMediaTypeNotFound = errors.New("media type not found in index")
+func (a *Agent) Migrate(ctx context.Context, req *v1.MigrateRequest) (*v1.MigrateResponse, error) {
+	ctx = relayContext(ctx)
+	to, err := api.Agent(req.To)
+	if err != nil {
+		return nil, err
+	}
+	defer to.Close()
+	if _, err := to.Get(ctx, &v1.GetRequest{
+		ID: req.ID,
+	}); err == nil {
+		return nil, errServiceExistsOnTarget
+	}
+	if _, err := a.Checkpoint(ctx, &v1.CheckpointRequest{
+		ID:   req.ID,
+		Live: req.Live,
+		Ref:  req.Ref,
+		Exit: req.Stop || req.Delete,
+	}); err != nil {
+		return nil, err
+	}
+	defer a.client.ImageService().Delete(ctx, req.Ref)
+	if _, err := a.Push(ctx, &v1.PushRequest{
+		Ref: req.Ref,
+	}); err != nil {
+		return nil, err
+	}
+	if _, err := to.Restore(ctx, &v1.RestoreRequest{
+		Ref:  req.Ref,
+		Live: req.Live,
+	}); err != nil {
+		return nil, err
+	}
+	if req.Delete {
+		if _, err := a.Delete(ctx, &v1.DeleteRequest{
+			ID: req.ID,
+		}); err != nil {
+			return nil, err
+		}
+	}
+	return &v1.MigrateResponse{}, nil
+}
+
+var (
+	errServiceExistsOnTarget = errors.New("service exists on target")
+	errMediaTypeNotFound     = errors.New("media type not found in index")
+)
 
 func getByMediaType(index *is.Index, mt string) (*is.Descriptor, error) {
 	for _, d := range index.Manifests {
