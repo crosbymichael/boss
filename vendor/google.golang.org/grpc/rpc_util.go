@@ -156,13 +156,11 @@ type callInfo struct {
 	compressorType        string
 	failFast              bool
 	stream                *clientStream
-	traceInfo             traceInfo // in trace.go
 	maxReceiveMessageSize *int
 	maxSendMessageSize    *int
 	creds                 credentials.PerRPCCredentials
 	contentSubtype        string
 	codec                 baseCodec
-	disableRetry          bool
 	maxRetryRPCBufferSize int
 }
 
@@ -533,7 +531,10 @@ func compress(in []byte, cp Compressor, compressor encoding.Compressor) ([]byte,
 	}
 	cbuf := &bytes.Buffer{}
 	if compressor != nil {
-		z, _ := compressor.Compress(cbuf)
+		z, err := compressor.Compress(cbuf)
+		if err != nil {
+			return nil, wrapErr(err)
+		}
 		if _, err := z.Write(in); err != nil {
 			return nil, wrapErr(err)
 		}
