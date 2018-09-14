@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os"
 	"os/signal"
@@ -10,6 +11,8 @@ import (
 	"github.com/crosbymichael/boss/api/v1"
 	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/system"
+	"github.com/crosbymichael/boss/util"
+	"github.com/ehazlett/element"
 	raven "github.com/getsentry/raven-go"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/urfave/cli"
@@ -29,6 +32,24 @@ var agentCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+		ip, err := util.GetIP(c.Iface)
+		if err != nil {
+			return err
+		}
+		address := fmt.Sprintf("%s:1337", ip)
+		node, err := element.NewAgent(&element.Config{
+			NodeName:         c.ID,
+			Address:          address,
+			ConnectionType:   string(element.LAN),
+			ClusterAddress:   c.Agent.AdvertiseAddress,
+			AdvertiseAddress: c.Agent.AdvertiseAddress,
+			Peers:            c.Agent.Peers,
+		})
+		if err != nil {
+			return err
+		}
+		node.Start(nil)
+
 		client, err := system.NewClient()
 		if err != nil {
 			return err
@@ -38,7 +59,7 @@ var agentCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		a, err := agent.New(c, client, store)
+		a, err := agent.New(c, client, store, node)
 		if err != nil {
 			return err
 		}
@@ -46,9 +67,10 @@ var agentCommand = cli.Command{
 		v1.RegisterAgentServer(server, a)
 		go func() {
 			<-s
+			node.Shutdown()
 			server.Stop()
 		}()
-		l, err := net.Listen("tcp", clix.GlobalString("agent"))
+		l, err := net.Listen("tcp", address)
 		if err != nil {
 			return err
 		}

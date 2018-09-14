@@ -21,8 +21,10 @@ RestartSec=5
 WantedBy=multi-user.target`
 
 type Agent struct {
-	PlainRemotes []string `toml:"plain_remotes"`
-	VolumeRoot   string   `toml:"volume_root"`
+	PlainRemotes     []string `toml:"plain_remotes"`
+	VolumeRoot       string   `toml:"volume_root"`
+	AdvertiseAddress string   `toml:"advertise_address"`
+	Peers            []string `toml:"peers"`
 }
 
 func (s *Agent) Name() string {

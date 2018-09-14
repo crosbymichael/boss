@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"sync"
 
@@ -41,6 +42,13 @@ func Load() (*Config, error) {
 	}
 	if c.Iface == "" {
 		c.Iface = "eth0"
+	}
+	if c.Agent.AdvertiseAddress == "" {
+		ip, err := util.GetIP(c.Iface)
+		if err != nil {
+			return nil, err
+		}
+		c.Agent.AdvertiseAddress = fmt.Sprintf("%s:1338", ip)
 	}
 	return &c, nil
 }
