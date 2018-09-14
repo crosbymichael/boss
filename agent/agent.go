@@ -524,6 +524,7 @@ func (a *Agent) Checkpoint(ctx context.Context, req *v1.CheckpointRequest) (*v1.
 		// checkpoint rw layer
 		opts := []diff.Opt{
 			diff.WithReference(fmt.Sprintf("checkpoint-rw-%s", info.SnapshotKey)),
+			diff.WithMediaType(is.MediaTypeImageLayer),
 		}
 		rw, err := rootfs.CreateDiff(ctx,
 			info.SnapshotKey,
