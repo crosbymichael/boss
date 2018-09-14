@@ -35,6 +35,8 @@ type Config struct {
 	AdvertiseAddress string
 	// Peers is a local cache of peer members
 	Peers []string
+	// Debug output for memberlist
+	Debug bool
 }
 
 func (a *Agent) Config() *Config {
@@ -58,9 +60,9 @@ func (cfg *Config) memberListConfig(peerUpdateChan chan bool, nodeEventChan chan
 	mc.Delegate = NewAgentDelegate(cfg.NodeName, cfg.Address, peerUpdateChan, nodeEventChan)
 	mc.Events = NewEventHandler(nodeEventChan)
 
-	// disable logging for memberlist
-	// TODO: enable if debug
-	mc.Logger = log.New(ioutil.Discard, "", 0)
+	if !cfg.Debug {
+		mc.Logger = log.New(ioutil.Discard, "", 0)
+	}
 
 	host, port, err := net.SplitHostPort(cfg.ClusterAddress)
 	if err != nil {

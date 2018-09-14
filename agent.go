@@ -15,6 +15,7 @@ import (
 	"github.com/ehazlett/element"
 	raven "github.com/getsentry/raven-go"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
@@ -24,6 +25,27 @@ import (
 var agentCommand = cli.Command{
 	Name:  "agent",
 	Usage: "run the boss agent",
+	Flags: []cli.Flag{
+		cli.IntFlag{
+			Name:  "port,p",
+			Usage: "agent port, the agent binds to all and you cannot change it",
+			Value: 1337,
+		},
+		cli.IntFlag{
+			Name:  "cluster-port",
+			Usage: "the cluster port for gossip",
+			Value: 1388,
+		},
+		cli.StringSliceFlag{
+			Name:  "peers",
+			Usage: "set the agent peers",
+			Value: &cli.StringSlice{},
+		},
+		cli.StringFlag{
+			Name:  "id",
+			Usage: "set the agent id",
+		},
+	},
 	Action: func(clix *cli.Context) error {
 		s := make(chan os.Signal, 32)
 		signal.Notify(s, os.Interrupt)
@@ -32,23 +54,36 @@ var agentCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+		id := clix.String("id")
+		if id == "" {
+			id = c.ID
+		}
 		ip, err := util.GetIP(c.Iface)
 		if err != nil {
 			return err
 		}
-		address := fmt.Sprintf("%s:1337", ip)
+		var (
+			address        = fmt.Sprintf("%s:%d", ip, clix.Int("port"))
+			clusterAddress = fmt.Sprintf("%s:%d", ip, clix.Int("cluster-port"))
+		)
+		logrus.WithField("address", address).Debug("agent address")
+		peers := append(c.Agent.Peers, clix.StringSlice("peers")...)
 		node, err := element.NewAgent(&element.Config{
-			NodeName:         c.ID,
+			NodeName:         id,
 			Address:          address,
 			ConnectionType:   string(element.LAN),
-			ClusterAddress:   c.Agent.AdvertiseAddress,
-			AdvertiseAddress: c.Agent.AdvertiseAddress,
-			Peers:            c.Agent.Peers,
+			ClusterAddress:   clusterAddress,
+			AdvertiseAddress: clusterAddress,
+			Peers:            peers,
+			Debug:            true,
 		})
 		if err != nil {
 			return err
 		}
-		node.Start(nil)
+		logrus.WithField("advertise", clusterAddress).Debug("agent cluster address")
+		if err := node.Start(nil); err != nil {
+			return err
+		}
 
 		client, err := system.NewClient()
 		if err != nil {
@@ -67,10 +102,10 @@ var agentCommand = cli.Command{
 		v1.RegisterAgentServer(server, a)
 		go func() {
 			<-s
-			node.Shutdown()
+			go node.Shutdown()
 			server.Stop()
 		}()
-		l, err := net.Listen("tcp", address)
+		l, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", clix.Int("port")))
 		if err != nil {
 			return err
 		}
