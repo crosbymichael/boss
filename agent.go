@@ -84,7 +84,6 @@ var agentCommand = cli.Command{
 		if err := node.Start(nil); err != nil {
 			return err
 		}
-
 		client, err := system.NewClient()
 		if err != nil {
 			return err

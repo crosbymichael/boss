@@ -37,6 +37,8 @@ type Config struct {
 	Peers []string
 	// Debug output for memberlist
 	Debug bool
+	// Labels for the peer
+	Labels map[string]string
 }
 
 func (a *Agent) Config() *Config {
@@ -57,7 +59,7 @@ func (cfg *Config) memberListConfig(peerUpdateChan chan bool, nodeEventChan chan
 	}
 
 	mc.Name = cfg.NodeName
-	mc.Delegate = NewAgentDelegate(cfg.NodeName, cfg.Address, peerUpdateChan, nodeEventChan)
+	mc.Delegate = NewAgentDelegate(cfg.NodeName, cfg.Address, cfg.Labels, peerUpdateChan, nodeEventChan)
 	mc.Events = NewEventHandler(nodeEventChan)
 
 	if !cfg.Debug {

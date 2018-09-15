@@ -38,6 +38,8 @@ import (
 	ver "github.com/opencontainers/image-spec/specs-go"
 	is "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
+	lconfig "github.com/siddontang/ledisdb/config"
+	"github.com/siddontang/ledisdb/server"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
@@ -62,12 +64,27 @@ func New(c *config.Config, client *containerd.Client, store config.ConfigStore, 
 	for _, r := range c.Agent.PlainRemotes {
 		plainRemotes[r] = true
 	}
+	cfg := lconfig.NewConfigDefault()
+	cfg.Addr = "0.0.0.0:6379"
+	cfg.UseReplication = true
+	cfg.DataDir = filepath.Join(v1.Root, "db")
+	if !c.Agent.Master {
+		// get slaves from member list
+		// cfg.SlaveOf = "127.0.0.1:6379"
+		cfg.Readonly = true
+	}
+	server, err := server.NewApp(cfg)
+	if err != nil {
+		return nil, err
+	}
+	go server.Run()
 	return &Agent{
 		c:        c,
 		client:   client,
 		store:    store,
 		register: register,
 		node:     node,
+		server:   server,
 	}, nil
 }
 
@@ -77,6 +94,12 @@ type Agent struct {
 	store    config.ConfigStore
 	register v1.Register
 	node     *element.Agent
+	server   *server.App
+}
+
+func (a *Agent) Close() error {
+	a.server.Close()
+	return nil
 }
 
 func (a *Agent) Create(ctx context.Context, req *v1.CreateRequest) (*types.Empty, error) {

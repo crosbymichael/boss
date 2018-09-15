@@ -8,19 +8,21 @@ import (
 )
 
 type agentDelegate struct {
-	Name          string
-	Addr          string
-	Updated       time.Time
-	Peers         map[string]*PeerAgent
+	PeerAgent
+	Peers map[string]*PeerAgent `json:"peers"`
+
 	updateChan    chan bool
 	nodeEventChan chan *NodeEvent
 }
 
 // NewAgentDelegate is the agent delegate used to handle cluster events
-func NewAgentDelegate(name, addr string, updateCh chan bool, nodeEventCh chan *NodeEvent) *agentDelegate {
+func NewAgentDelegate(name, addr string, labels map[string]string, updateCh chan bool, nodeEventCh chan *NodeEvent) *agentDelegate {
 	agent := &agentDelegate{
-		Name:          name,
-		Addr:          addr,
+		PeerAgent: PeerAgent{
+			Name:   name,
+			Addr:   addr,
+			Labels: labels,
+		},
 		Peers:         make(map[string]*PeerAgent),
 		updateChan:    updateCh,
 		nodeEventChan: nodeEventCh,
@@ -83,7 +85,7 @@ func (d *agentDelegate) MergeRemoteState(buf []byte, join bool) {
 	d.Peers[remoteAgent.Name] = &PeerAgent{
 		Name:    remoteAgent.Name,
 		Addr:    remoteAgent.Addr,
-		Updated: time.Now(),
+		Updated: d.Updated,
 	}
 	// notify update
 	d.updateChan <- true

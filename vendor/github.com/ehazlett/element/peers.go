@@ -7,9 +7,10 @@ import (
 
 // PeerAgent is the peer information for an agent in the cluster including name and GRPC address
 type PeerAgent struct {
-	Name    string
-	Addr    string
-	Updated time.Time
+	Name    string            `json:"name"`
+	Addr    string            `json:"addr"`
+	Updated time.Time         `json:"updated"`
+	Labels  map[string]string `json:"labels"`
 }
 
 // Peers returns all known peers in the cluster

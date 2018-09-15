@@ -24,6 +24,7 @@ type Agent struct {
 	PlainRemotes []string `toml:"plain_remotes"`
 	VolumeRoot   string   `toml:"volume_root"`
 	Peers        []string `toml:"peers"`
+	Master       bool     `toml:"master"`
 }
 
 func (s *Agent) Name() string {
