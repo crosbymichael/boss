@@ -33,6 +33,7 @@ import (
 	"github.com/crosbymichael/boss/flux"
 	"github.com/crosbymichael/boss/opts"
 	"github.com/crosbymichael/boss/systemd"
+	"github.com/ehazlett/element"
 	"github.com/gogo/protobuf/types"
 	ver "github.com/opencontainers/image-spec/specs-go"
 	is "github.com/opencontainers/image-spec/specs-go/v1"
@@ -53,7 +54,7 @@ const (
 	MediaTypeContainerInfo = "application/vnd.boss.container.info.v1+json"
 )
 
-func New(c *config.Config, client *containerd.Client, store config.ConfigStore) (*Agent, error) {
+func New(c *config.Config, client *containerd.Client, store config.ConfigStore, node *element.Agent) (*Agent, error) {
 	register, err := c.GetRegister()
 	if err != nil {
 		return nil, err
@@ -66,6 +67,7 @@ func New(c *config.Config, client *containerd.Client, store config.ConfigStore) 
 		client:   client,
 		store:    store,
 		register: register,
+		node:     node,
 	}, nil
 }
 
@@ -74,6 +76,7 @@ type Agent struct {
 	client   *containerd.Client
 	store    config.ConfigStore
 	register v1.Register
+	node     *element.Agent
 }
 
 func (a *Agent) Create(ctx context.Context, req *v1.CreateRequest) (*types.Empty, error) {

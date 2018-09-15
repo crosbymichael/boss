@@ -65,8 +65,6 @@ var (
 	errConnDrain = errors.New("grpc: the connection is drained")
 	// errConnClosing indicates that the connection is closing.
 	errConnClosing = errors.New("grpc: the connection is closing")
-	// errConnUnavailable indicates that the connection is unavailable.
-	errConnUnavailable = errors.New("grpc: the connection is unavailable")
 	// errBalancerClosed indicates that the balancer is closed.
 	errBalancerClosed = errors.New("grpc: balancer is closed")
 	// We use an accessor so that minConnectTimeout can be
@@ -89,8 +87,6 @@ var (
 	// errCredentialsConflict indicates that grpc.WithTransportCredentials()
 	// and grpc.WithInsecure() are both called for a connection.
 	errCredentialsConflict = errors.New("grpc: transport credentials are set for an insecure connection (grpc.WithTransportCredentials() and grpc.WithInsecure() are both called)")
-	// errNetworkIO indicates that the connection is down due to some network I/O error.
-	errNetworkIO = errors.New("grpc: failed with network I/O error")
 )
 
 const (
@@ -100,12 +96,6 @@ const (
 	defaultWriteBufSize = 32 * 1024
 	defaultReadBufSize  = 32 * 1024
 )
-
-// RegisterChannelz turns on channelz service.
-// This is an EXPERIMENTAL API.
-func RegisterChannelz() {
-	channelz.TurnOn()
-}
 
 // Dial creates a client connection to the given target.
 func Dial(target string, opts ...DialOption) (*ClientConn, error) {
@@ -147,9 +137,22 @@ func DialContext(ctx context.Context, target string, opts ...DialOption) (conn *
 	if channelz.IsOn() {
 		if cc.dopts.channelzParentID != 0 {
 			cc.channelzID = channelz.RegisterChannel(&channelzChannel{cc}, cc.dopts.channelzParentID, target)
+			channelz.AddTraceEvent(cc.channelzID, &channelz.TraceEventDesc{
+				Desc:     "Channel Created",
+				Severity: channelz.CtINFO,
+				Parent: &channelz.TraceEventDesc{
+					Desc:     fmt.Sprintf("Nested Channel(id:%d) created", cc.channelzID),
+					Severity: channelz.CtINFO,
+				},
+			})
 		} else {
 			cc.channelzID = channelz.RegisterChannel(&channelzChannel{cc}, 0, target)
+			channelz.AddTraceEvent(cc.channelzID, &channelz.TraceEventDesc{
+				Desc:     "Channel Created",
+				Severity: channelz.CtINFO,
+			})
 		}
+		cc.csMgr.channelzID = cc.channelzID
 	}
 
 	if !cc.dopts.insecure {
@@ -294,6 +297,13 @@ func DialContext(ctx context.Context, target string, opts ...DialOption) (conn *
 			s := cc.GetState()
 			if s == connectivity.Ready {
 				break
+			} else if cc.dopts.copts.FailOnNonTempDialError && s == connectivity.TransientFailure {
+				if err = cc.blockingpicker.connectionError(); err != nil {
+					terr, ok := err.(interface{ Temporary() bool })
+					if ok && !terr.Temporary() {
+						return nil, err
+					}
+				}
 			}
 			if !cc.WaitForStateChange(ctx, s) {
 				// ctx got timeout or canceled.
@@ -311,6 +321,7 @@ type connectivityStateManager struct {
 	mu         sync.Mutex
 	state      connectivity.State
 	notifyChan chan struct{}
+	channelzID int64
 }
 
 // updateState updates the connectivity.State of ClientConn.
@@ -326,6 +337,12 @@ func (csm *connectivityStateManager) updateState(state connectivity.State) {
 		return
 	}
 	csm.state = state
+	if channelz.IsOn() {
+		channelz.AddTraceEvent(csm.channelzID, &channelz.TraceEventDesc{
+			Desc:     fmt.Sprintf("Channel Connectivity change to %v", state),
+			Severity: channelz.CtINFO,
+		})
+	}
 	if csm.notifyChan != nil {
 		// There are other goroutines waiting on this channel.
 		close(csm.notifyChan)
@@ -503,10 +520,26 @@ func (cc *ClientConn) switchBalancer(name string) {
 	}
 
 	builder := balancer.Get(name)
+	// TODO(yuxuanli): If user send a service config that does not contain a valid balancer name, should
+	// we reuse previous one?
+	if channelz.IsOn() {
+		if builder == nil {
+			channelz.AddTraceEvent(cc.channelzID, &channelz.TraceEventDesc{
+				Desc:     fmt.Sprintf("Channel switches to new LB policy %q due to fallback from invalid balancer name", PickFirstBalancerName),
+				Severity: channelz.CtWarning,
+			})
+		} else {
+			channelz.AddTraceEvent(cc.channelzID, &channelz.TraceEventDesc{
+				Desc:     fmt.Sprintf("Channel switches to new LB policy %q", name),
+				Severity: channelz.CtINFO,
+			})
+		}
+	}
 	if builder == nil {
 		grpclog.Infof("failed to get balancer builder for: %v, using pick_first instead", name)
 		builder = newPickfirstBuilder()
 	}
+
 	cc.preBalancerName = cc.curBalancerName
 	cc.curBalancerName = builder.Name()
 	cc.balancerWrapper = newCCBalancerWrapper(cc, builder, cc.balancerBuildOpts)
@@ -529,10 +562,11 @@ func (cc *ClientConn) handleSubConnStateChange(sc balancer.SubConn, s connectivi
 // Caller needs to make sure len(addrs) > 0.
 func (cc *ClientConn) newAddrConn(addrs []resolver.Address) (*addrConn, error) {
 	ac := &addrConn{
-		cc:     cc,
-		addrs:  addrs,
-		dopts:  cc.dopts,
-		czData: new(channelzData),
+		cc:           cc,
+		addrs:        addrs,
+		dopts:        cc.dopts,
+		czData:       new(channelzData),
+		resetBackoff: make(chan struct{}),
 	}
 	ac.ctx, ac.cancel = context.WithCancel(cc.ctx)
 	// Track ac in cc. This needs to be done before any getTransport(...) is called.
@@ -543,6 +577,14 @@ func (cc *ClientConn) newAddrConn(addrs []resolver.Address) (*addrConn, error) {
 	}
 	if channelz.IsOn() {
 		ac.channelzID = channelz.RegisterSubChannel(ac, cc.channelzID, "")
+		channelz.AddTraceEvent(ac.channelzID, &channelz.TraceEventDesc{
+			Desc:     "Subchannel Created",
+			Severity: channelz.CtINFO,
+			Parent: &channelz.TraceEventDesc{
+				Desc:     fmt.Sprintf("Subchannel(id:%d) created", ac.channelzID),
+				Severity: channelz.CtINFO,
+			},
+		})
 	}
 	cc.conns[ac] = struct{}{}
 	cc.mu.Unlock()
@@ -607,7 +649,7 @@ func (ac *addrConn) connect() error {
 		ac.mu.Unlock()
 		return nil
 	}
-	ac.state = connectivity.Connecting
+	ac.updateConnectivityState(connectivity.Connecting)
 	ac.cc.handleSubConnStateChange(ac.acbw, ac.state)
 	ac.mu.Unlock()
 
@@ -692,6 +734,17 @@ func (cc *ClientConn) handleServiceConfig(js string) error {
 	if cc.dopts.disableServiceConfig {
 		return nil
 	}
+	if cc.scRaw == js {
+		return nil
+	}
+	if channelz.IsOn() {
+		channelz.AddTraceEvent(cc.channelzID, &channelz.TraceEventDesc{
+			// The special formatting of \"%s\" instead of %q is to provide nice printing of service config
+			// for human consumption.
+			Desc:     fmt.Sprintf("Channel has a new service config \"%s\"", js),
+			Severity: channelz.CtINFO,
+		})
+	}
 	sc, err := parseServiceConfig(js)
 	if err != nil {
 		return err
@@ -740,6 +793,24 @@ func (cc *ClientConn) resolveNow(o resolver.ResolveNowOption) {
 	go r.resolveNow(o)
 }
 
+// ResetConnectBackoff wakes up all subchannels in transient failure and causes
+// them to attempt another connection immediately.  It also resets the backoff
+// times used for subsequent attempts regardless of the current state.
+//
+// In general, this function should not be used.  Typical service or network
+// outages result in a reasonable client reconnection strategy by default.
+// However, if a previously unavailable network becomes available, this may be
+// used to trigger an immediate reconnect.
+//
+// This API is EXPERIMENTAL.
+func (cc *ClientConn) ResetConnectBackoff() {
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
+	for ac := range cc.conns {
+		ac.resetConnectBackoff()
+	}
+}
+
 // Close tears down the ClientConn and all underlying connections.
 func (cc *ClientConn) Close() error {
 	defer cc.cancel()
@@ -772,6 +843,19 @@ func (cc *ClientConn) Close() error {
 		ac.tearDown(ErrClientConnClosing)
 	}
 	if channelz.IsOn() {
+		ted := &channelz.TraceEventDesc{
+			Desc:     "Channel Deleted",
+			Severity: channelz.CtINFO,
+		}
+		if cc.dopts.channelzParentID != 0 {
+			ted.Parent = &channelz.TraceEventDesc{
+				Desc:     fmt.Sprintf("Nested channel(id:%d) deleted", cc.channelzID),
+				Severity: channelz.CtINFO,
+			}
+		}
+		channelz.AddTraceEvent(cc.channelzID, ted)
+		// TraceEvent needs to be called before RemoveEntry, as TraceEvent may add trace reference to
+		// the entity beng deleted, and thus prevent it from being deleted right away.
 		channelz.RemoveEntry(cc.channelzID)
 	}
 	return nil
@@ -791,7 +875,8 @@ type addrConn struct {
 	mu           sync.Mutex
 	curAddr      resolver.Address
 	reconnectIdx int // The index in addrs list to start reconnecting from.
-	state        connectivity.State
+	// Use updateConnectivityState for updating addrConn's connectivity state.
+	state connectivity.State
 	// ready is closed and becomes nil when a new transport is up or failed
 	// due to timeout.
 	ready     chan struct{}
@@ -808,8 +893,20 @@ type addrConn struct {
 	// negotiations must complete.
 	connectDeadline time.Time
 
+	resetBackoff chan struct{}
+
 	channelzID int64 // channelz unique identification number
 	czData     *channelzData
+}
+
+func (ac *addrConn) updateConnectivityState(s connectivity.State) {
+	ac.state = s
+	if channelz.IsOn() {
+		channelz.AddTraceEvent(ac.channelzID, &channelz.TraceEventDesc{
+			Desc:     fmt.Sprintf("Subchannel Connectivity change to %v", s),
+			Severity: channelz.CtINFO,
+		})
+	}
 }
 
 // adjustParams updates parameters used to create transports upon
@@ -831,14 +928,6 @@ func (ac *addrConn) adjustParams(r transport.GoAwayReason) {
 func (ac *addrConn) printf(format string, a ...interface{}) {
 	if ac.events != nil {
 		ac.events.Printf(format, a...)
-	}
-}
-
-// errorf records an error in ac's event log, unless ac has been closed.
-// REQUIRES ac.mu is held.
-func (ac *addrConn) errorf(format string, a ...interface{}) {
-	if ac.events != nil {
-		ac.events.Errorf(format, a...)
 	}
 }
 
@@ -872,6 +961,7 @@ func (ac *addrConn) resetTransport() error {
 	ac.dopts.copts.KeepaliveParams = ac.cc.mkp
 	ac.cc.mu.RUnlock()
 	var backoffDeadline, connectDeadline time.Time
+	var resetBackoff chan struct{}
 	for connectRetryNum := 0; ; connectRetryNum++ {
 		ac.mu.Lock()
 		if ac.backoffDeadline.IsZero() {
@@ -879,6 +969,7 @@ func (ac *addrConn) resetTransport() error {
 			// or this is the first time this addrConn is trying to establish a
 			// connection.
 			backoffFor := ac.dopts.bs.Backoff(connectRetryNum) // time.Duration.
+			resetBackoff = ac.resetBackoff
 			// This will be the duration that dial gets to finish.
 			dialDuration := getMinConnectTimeout()
 			if backoffFor > dialDuration {
@@ -904,7 +995,7 @@ func (ac *addrConn) resetTransport() error {
 		}
 		ac.printf("connecting")
 		if ac.state != connectivity.Connecting {
-			ac.state = connectivity.Connecting
+			ac.updateConnectivityState(connectivity.Connecting)
 			ac.cc.handleSubConnStateChange(ac.acbw, ac.state)
 		}
 		// copy ac.addrs in case of race
@@ -912,7 +1003,7 @@ func (ac *addrConn) resetTransport() error {
 		copy(addrsIter, ac.addrs)
 		copts := ac.dopts.copts
 		ac.mu.Unlock()
-		connected, err := ac.createTransport(connectRetryNum, ridx, backoffDeadline, connectDeadline, addrsIter, copts)
+		connected, err := ac.createTransport(connectRetryNum, ridx, backoffDeadline, connectDeadline, addrsIter, copts, resetBackoff)
 		if err != nil {
 			return err
 		}
@@ -924,9 +1015,15 @@ func (ac *addrConn) resetTransport() error {
 
 // createTransport creates a connection to one of the backends in addrs.
 // It returns true if a connection was established.
-func (ac *addrConn) createTransport(connectRetryNum, ridx int, backoffDeadline, connectDeadline time.Time, addrs []resolver.Address, copts transport.ConnectOptions) (bool, error) {
+func (ac *addrConn) createTransport(connectRetryNum, ridx int, backoffDeadline, connectDeadline time.Time, addrs []resolver.Address, copts transport.ConnectOptions, resetBackoff chan struct{}) (bool, error) {
 	for i := ridx; i < len(addrs); i++ {
 		addr := addrs[i]
+		if channelz.IsOn() {
+			channelz.AddTraceEvent(ac.channelzID, &channelz.TraceEventDesc{
+				Desc:     fmt.Sprintf("Subchannel picks a new address %q to connect", addr.Addr),
+				Severity: channelz.CtINFO,
+			})
+		}
 		target := transport.TargetInfo{
 			Addr:      addr.Addr,
 			Metadata:  addr.Metadata,
@@ -987,7 +1084,7 @@ func (ac *addrConn) createTransport(connectRetryNum, ridx int, backoffDeadline, 
 			return false, errConnClosing
 		}
 		ac.printf("ready")
-		ac.state = connectivity.Ready
+		ac.updateConnectivityState(connectivity.Ready)
 		ac.cc.handleSubConnStateChange(ac.acbw, ac.state)
 		ac.transport = newTr
 		ac.curAddr = addr
@@ -1013,7 +1110,7 @@ func (ac *addrConn) createTransport(connectRetryNum, ridx int, backoffDeadline, 
 		ac.mu.Unlock()
 		return false, errConnClosing
 	}
-	ac.state = connectivity.TransientFailure
+	ac.updateConnectivityState(connectivity.TransientFailure)
 	ac.cc.handleSubConnStateChange(ac.acbw, ac.state)
 	ac.cc.resolveNow(resolver.ResolveNowOption{})
 	if ac.ready != nil {
@@ -1024,11 +1121,21 @@ func (ac *addrConn) createTransport(connectRetryNum, ridx int, backoffDeadline, 
 	timer := time.NewTimer(backoffDeadline.Sub(time.Now()))
 	select {
 	case <-timer.C:
+	case <-resetBackoff:
+		timer.Stop()
 	case <-ac.ctx.Done():
 		timer.Stop()
 		return false, ac.ctx.Err()
 	}
 	return false, nil
+}
+
+func (ac *addrConn) resetConnectBackoff() {
+	ac.mu.Lock()
+	close(ac.resetBackoff)
+	ac.resetBackoff = make(chan struct{})
+	ac.connectRetryNum = 0
+	ac.mu.Unlock()
 }
 
 // Run in a goroutine to track the error in transport and create the
@@ -1092,7 +1199,7 @@ func (ac *addrConn) transportMonitor() {
 		}
 		// Set connectivity state to TransientFailure before calling
 		// resetTransport. Transition READY->CONNECTING is not valid.
-		ac.state = connectivity.TransientFailure
+		ac.updateConnectivityState(connectivity.TransientFailure)
 		ac.cc.handleSubConnStateChange(ac.acbw, ac.state)
 		ac.cc.resolveNow(resolver.ResolveNowOption{})
 		ac.curAddr = resolver.Address{}
@@ -1153,7 +1260,7 @@ func (ac *addrConn) tearDown(err error) {
 		// address removal and GoAway.
 		ac.transport.GracefulClose()
 	}
-	ac.state = connectivity.Shutdown
+	ac.updateConnectivityState(connectivity.Shutdown)
 	ac.tearDownErr = err
 	ac.cc.handleSubConnStateChange(ac.acbw, ac.state)
 	if ac.events != nil {
@@ -1165,6 +1272,16 @@ func (ac *addrConn) tearDown(err error) {
 		ac.ready = nil
 	}
 	if channelz.IsOn() {
+		channelz.AddTraceEvent(ac.channelzID, &channelz.TraceEventDesc{
+			Desc:     "Subchannel Deleted",
+			Severity: channelz.CtINFO,
+			Parent: &channelz.TraceEventDesc{
+				Desc:     fmt.Sprintf("Subchanel(id:%d) deleted", ac.channelzID),
+				Severity: channelz.CtINFO,
+			},
+		})
+		// TraceEvent needs to be called before RemoveEntry, as TraceEvent may add trace reference to
+		// the entity beng deleted, and thus prevent it from being deleted right away.
 		channelz.RemoveEntry(ac.channelzID)
 	}
 }
