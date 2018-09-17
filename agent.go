@@ -69,7 +69,7 @@ var agentCommand = cli.Command{
 			peers          = append(c.Agent.Peers, clix.StringSlice("peers")...)
 		)
 		if c.Agent.Master {
-			labels[agent.Master] = ""
+			labels[agent.Master] = "!"
 		}
 		logrus.WithField("address", address).Debug("agent address")
 		node, err := element.NewAgent(&element.Config{

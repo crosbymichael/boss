@@ -37,5 +37,6 @@ func (a *Agent) LocalNode() (*PeerAgent, error) {
 		Name:    a.config.NodeName,
 		Addr:    a.config.Address,
 		Updated: time.Now(),
+		Labels:  a.config.Labels,
 	}, nil
 }

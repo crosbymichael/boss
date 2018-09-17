@@ -814,6 +814,26 @@ func (a *Agent) Migrate(ctx context.Context, req *v1.MigrateRequest) (*v1.Migrat
 	return &v1.MigrateResponse{}, nil
 }
 
+func (a *Agent) Nodes(ctx context.Context, req *v1.NodesRequest) (*v1.NodesResponse, error) {
+	me, err := a.node.LocalNode()
+	if err != nil {
+		return nil, err
+	}
+	peers, err := a.node.Peers()
+	if err != nil {
+		return nil, err
+	}
+	var resp v1.NodesResponse
+	for _, p := range append(peers, me) {
+		resp.Nodes = append(resp.Nodes, &v1.Node{
+			ID:      p.Name,
+			Address: p.Addr,
+			Labels:  p.Labels,
+		})
+	}
+	return &resp, nil
+}
+
 func (a *Agent) doLocal(action string, args ...interface{}) (interface{}, error) {
 	conn := a.local.Get()
 	defer conn.Close()

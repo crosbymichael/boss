@@ -23,6 +23,7 @@ service Agent {
 	rpc Checkpoint(CheckpointRequest) returns (CheckpointResponse);
 	rpc Restore(RestoreRequest) returns (RestoreResponse);
 	rpc Migrate(MigrateRequest) returns (MigrateResponse);
+	rpc Nodes(NodesRequest) returns (NodesResponse);
 }
 
 message CreateRequest {
@@ -53,6 +54,19 @@ message ListRequest {
 
 message ListResponse {
 	repeated ContainerInfo containers = 1;
+}
+
+message NodesRequest {
+}
+
+message NodesResponse {
+	repeated Node nodes = 1;
+}
+
+message Node {
+	string id = 1 [(gogoproto.customname) = "ID"];;
+	string address = 2;
+	map<string, string> labels = 3;
 }
 
 message ContainerInfo {
