@@ -12,6 +12,7 @@ const (
 	state            = "/run/boss"
 	DefaultRuntime   = "io.containerd.runc.v1"
 	DefaultNamespace = "boss"
+	// configuration keys
 )
 
 func StatePath(id string) string {

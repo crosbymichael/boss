@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/containerd/cgroups"
@@ -35,6 +36,7 @@ import (
 	"github.com/crosbymichael/boss/systemd"
 	"github.com/ehazlett/element"
 	"github.com/gogo/protobuf/types"
+	"github.com/gomodule/redigo/redis"
 	ver "github.com/opencontainers/image-spec/specs-go"
 	is "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
@@ -54,6 +56,7 @@ var (
 
 const (
 	MediaTypeContainerInfo = "application/vnd.boss.container.info.v1+json"
+	Master                 = "boss.io/master"
 )
 
 func New(c *config.Config, client *containerd.Client, store config.ConfigStore, node *element.Agent) (*Agent, error) {
@@ -64,6 +67,53 @@ func New(c *config.Config, client *containerd.Client, store config.ConfigStore, 
 	for _, r := range c.Agent.PlainRemotes {
 		plainRemotes[r] = true
 	}
+	server, err := newLocalStore(c)
+	if err != nil {
+		return nil, err
+	}
+	peers, err := node.Peers()
+	if err != nil {
+		return nil, err
+	}
+	var (
+		master string
+		local  = "127.0.0.1:6379"
+	)
+	for _, p := range peers {
+		if _, ok := p.Labels[Master]; ok {
+			master = p.Addr
+			break
+		}
+	}
+	if master == "" {
+		return nil, errors.New("unable to find master in cluster")
+	}
+	mp := newPool(master)
+	var lp *redis.Pool
+	if c.Agent.Master {
+		lp = mp
+	} else {
+		lp = newPool(local)
+	}
+	return &Agent{
+		c:        c,
+		client:   client,
+		store:    store,
+		register: register,
+		node:     node,
+		server:   server,
+		master:   mp,
+		local:    lp,
+	}, nil
+}
+
+func newPool(address string) *redis.Pool {
+	return redis.NewPool(func() (redis.Conn, error) {
+		return redis.Dial("tcp", address)
+	}, 5)
+}
+
+func newLocalStore(c *config.Config) (*server.App, error) {
 	cfg := lconfig.NewConfigDefault()
 	cfg.Addr = "0.0.0.0:6379"
 	cfg.UseReplication = true
@@ -77,15 +127,14 @@ func New(c *config.Config, client *containerd.Client, store config.ConfigStore, 
 	if err != nil {
 		return nil, err
 	}
-	go server.Run()
-	return &Agent{
-		c:        c,
-		client:   client,
-		store:    store,
-		register: register,
-		node:     node,
-		server:   server,
-	}, nil
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		wg.Done()
+		server.Run()
+	}()
+	wg.Wait()
+	return server, nil
 }
 
 type Agent struct {
@@ -95,10 +144,14 @@ type Agent struct {
 	register v1.Register
 	node     *element.Agent
 	server   *server.App
+	master   *redis.Pool
+	local    *redis.Pool
 }
 
 func (a *Agent) Close() error {
 	a.server.Close()
+	a.master.Close()
+	a.local.Close()
 	return nil
 }
 

@@ -27,7 +27,7 @@ var agentCommand = cli.Command{
 	Usage: "run the boss agent",
 	Flags: []cli.Flag{
 		cli.IntFlag{
-			Name:  "port,p",
+			Name:  "agent-port,p",
 			Usage: "agent port, the agent binds to all and you cannot change it",
 			Value: 1337,
 		},
@@ -63,11 +63,15 @@ var agentCommand = cli.Command{
 			return err
 		}
 		var (
+			labels         = make(map[string]string)
 			address        = fmt.Sprintf("%s:%d", ip, clix.Int("port"))
 			clusterAddress = fmt.Sprintf("%s:%d", ip, clix.Int("cluster-port"))
+			peers          = append(c.Agent.Peers, clix.StringSlice("peers")...)
 		)
+		if c.Agent.Master {
+			labels[agent.Master] = ""
+		}
 		logrus.WithField("address", address).Debug("agent address")
-		peers := append(c.Agent.Peers, clix.StringSlice("peers")...)
 		node, err := element.NewAgent(&element.Config{
 			NodeName:         id,
 			Address:          address,
@@ -76,6 +80,7 @@ var agentCommand = cli.Command{
 			AdvertiseAddress: clusterAddress,
 			Peers:            peers,
 			Debug:            true,
+			Labels:           labels,
 		})
 		if err != nil {
 			return err
