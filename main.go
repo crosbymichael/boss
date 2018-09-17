@@ -45,7 +45,7 @@ run containers like a boss`
 		cli.StringFlag{
 			Name:   "agent",
 			Usage:  "agent address",
-			Value:  "0.0.0.0:1337",
+			Value:  "127.0.0.1:1337",
 			EnvVar: "BOSS_AGENT",
 		},
 		cli.StringFlag{

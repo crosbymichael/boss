@@ -67,22 +67,25 @@ func New(c *config.Config, client *containerd.Client, store config.ConfigStore, 
 	if err != nil {
 		return nil, err
 	}
-	peers, err := node.Peers()
-	if err != nil {
-		return nil, err
-	}
 	var (
-		master string
 		local  = "127.0.0.1:6379"
+		master = local
 	)
-	for _, p := range peers {
-		if _, ok := p.Labels[Master]; ok {
-			master = p.Addr
-			break
+	if !c.Agent.Master {
+		master = ""
+		peers, err := node.Peers()
+		if err != nil {
+			return nil, err
 		}
-	}
-	if master == "" {
-		return nil, errors.New("unable to find master in cluster")
+		for _, p := range peers {
+			if _, ok := p.Labels[Master]; ok {
+				master = p.Addr
+				break
+			}
+		}
+		if master == "" {
+			return nil, errors.New("unable to find master in cluster")
+		}
 	}
 	mp := newPool(master)
 	var lp *redis.Pool
@@ -170,7 +173,7 @@ func (a *Agent) Create(ctx context.Context, req *v1.CreateRequest) (*types.Empty
 		return empty, err
 	}
 	volumeRoot, err := redis.String(a.doLocal("GET", v1.VolumeRootKey))
-	if err != nil {
+	if err != nil && err != redis.ErrNil {
 		return nil, err
 	}
 	container, err := a.client.NewContainer(ctx,
@@ -426,7 +429,7 @@ func (a *Agent) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateRe
 		}
 	}
 	volumeRoot, err := redis.String(a.doLocal("GET", v1.VolumeRootKey))
-	if err != nil {
+	if err != nil && err != redis.ErrNil {
 		return nil, err
 	}
 	var changes []change
@@ -716,7 +719,7 @@ func (a *Agent) Restore(ctx context.Context, req *v1.RestoreRequest) (*v1.Restor
 		return nil, err
 	}
 	volumeRoot, err := redis.String(a.doLocal("GET", v1.VolumeRootKey))
-	if err != nil {
+	if err != nil && err != redis.ErrNil {
 		return nil, err
 	}
 	o := []containerd.NewContainerOpts{
@@ -835,7 +838,7 @@ func (a *Agent) withPlainRemote(ref string) containerd.RemoteOpt {
 	remote := strings.SplitN(ref, "/", 2)[0]
 	return func(_ *containerd.Client, ctx *containerd.RemoteContext) error {
 		ok, err := redis.Bool(a.doLocal("SISMEMBER", v1.PlainRemotesKey, remote))
-		if err != nil {
+		if err != nil && err != redis.ErrNil {
 			return err
 		}
 		ctx.Resolver = docker.NewResolver(docker.ResolverOptions{

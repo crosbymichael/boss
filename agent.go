@@ -34,7 +34,7 @@ var agentCommand = cli.Command{
 		cli.IntFlag{
 			Name:  "cluster-port",
 			Usage: "the cluster port for gossip",
-			Value: 1388,
+			Value: 1338,
 		},
 		cli.StringSliceFlag{
 			Name:  "peers",
@@ -64,7 +64,7 @@ var agentCommand = cli.Command{
 		}
 		var (
 			labels         = make(map[string]string)
-			address        = fmt.Sprintf("%s:%d", ip, clix.Int("port"))
+			address        = fmt.Sprintf("%s:%d", ip, clix.Int("agent-port"))
 			clusterAddress = fmt.Sprintf("%s:%d", ip, clix.Int("cluster-port"))
 			peers          = append(c.Agent.Peers, clix.StringSlice("peers")...)
 		)
@@ -109,7 +109,7 @@ var agentCommand = cli.Command{
 			go node.Shutdown()
 			server.Stop()
 		}()
-		l, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", clix.Int("port")))
+		l, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", clix.Int("agent-port")))
 		if err != nil {
 			return err
 		}
