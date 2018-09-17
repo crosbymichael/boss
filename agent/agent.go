@@ -47,9 +47,8 @@ import (
 )
 
 var (
-	ErrNoID      = errors.New("no id provided")
-	ErrNoRef     = errors.New("no ref provided")
-	plainRemotes = make(map[string]bool)
+	ErrNoID  = errors.New("no id provided")
+	ErrNoRef = errors.New("no ref provided")
 
 	empty = &types.Empty{}
 )
@@ -63,9 +62,6 @@ func New(c *config.Config, client *containerd.Client, store config.ConfigStore, 
 	register, err := c.GetRegister()
 	if err != nil {
 		return nil, err
-	}
-	for _, r := range c.Agent.PlainRemotes {
-		plainRemotes[r] = true
 	}
 	server, err := newLocalStore(c)
 	if err != nil {
@@ -94,6 +90,11 @@ func New(c *config.Config, client *containerd.Client, store config.ConfigStore, 
 		lp = mp
 	} else {
 		lp = newPool(local)
+		conn := lp.Get()
+		defer conn.Close()
+		if _, err := conn.Do("SLAVEOF", master); err != nil {
+			return nil, err
+		}
 	}
 	return &Agent{
 		c:        c,
@@ -119,8 +120,6 @@ func newLocalStore(c *config.Config) (*server.App, error) {
 	cfg.UseReplication = true
 	cfg.DataDir = filepath.Join(v1.Root, "db")
 	if !c.Agent.Master {
-		// get slaves from member list
-		// cfg.SlaveOf = "127.0.0.1:6379"
 		cfg.Readonly = true
 	}
 	server, err := server.NewApp(cfg)
@@ -157,7 +156,7 @@ func (a *Agent) Close() error {
 
 func (a *Agent) Create(ctx context.Context, req *v1.CreateRequest) (*types.Empty, error) {
 	ctx = relayContext(ctx)
-	image, err := a.client.Pull(ctx, req.Container.Image, containerd.WithPullUnpack, withPlainRemote(req.Container.Image))
+	image, err := a.client.Pull(ctx, req.Container.Image, containerd.WithPullUnpack, a.withPlainRemote(req.Container.Image))
 	if err != nil {
 		return nil, err
 	}
@@ -170,10 +169,14 @@ func (a *Agent) Create(ctx context.Context, req *v1.CreateRequest) (*types.Empty
 		})
 		return empty, err
 	}
+	volumeRoot, err := redis.String(a.doLocal("GET", v1.VolumeRootKey))
+	if err != nil {
+		return nil, err
+	}
 	container, err := a.client.NewContainer(ctx,
 		req.Container.ID,
 		flux.WithNewSnapshot(image),
-		opts.WithBossConfig(a.c.Agent.VolumeRoot, req.Container, image),
+		opts.WithBossConfig(volumeRoot, req.Container, image),
 	)
 	if err != nil {
 		return nil, err
@@ -422,6 +425,10 @@ func (a *Agent) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateRe
 			logrus.WithError(err).Errorf("enable maintaince %s-%s", container.ID(), name)
 		}
 	}
+	volumeRoot, err := redis.String(a.doLocal("GET", v1.VolumeRootKey))
+	if err != nil {
+		return nil, err
+	}
 	var changes []change
 	for name := range current.Services {
 		if _, ok := req.Container.Services[name]; !ok {
@@ -435,11 +442,12 @@ func (a *Agent) Update(ctx context.Context, req *v1.UpdateRequest) (*v1.UpdateRe
 	changes = append(changes, &imageUpdateChange{
 		ref:    req.Container.Image,
 		client: a.client,
+		a:      a,
 	})
 	changes = append(changes, &configChange{
 		client:     a.client,
 		c:          req.Container,
-		volumeRoot: a.c.Agent.VolumeRoot,
+		volumeRoot: volumeRoot,
 	})
 	changes = append(changes, &filesChange{
 		c:     req.Container,
@@ -545,7 +553,7 @@ func (a *Agent) Push(ctx context.Context, req *v1.PushRequest) (*types.Empty, er
 	if err != nil {
 		return nil, err
 	}
-	return empty, a.client.Push(ctx, req.Ref, image.Target(), withPlainRemote(req.Ref))
+	return empty, a.client.Push(ctx, req.Ref, image.Target(), a.withPlainRemote(req.Ref))
 }
 
 func (a *Agent) Checkpoint(ctx context.Context, req *v1.CheckpointRequest) (*v1.CheckpointResponse, error) {
@@ -676,7 +684,7 @@ func (a *Agent) Restore(ctx context.Context, req *v1.RestoreRequest) (*v1.Restor
 		if !errdefs.IsNotFound(err) {
 			return nil, err
 		}
-		ck, err := a.client.Fetch(ctx, req.Ref, withPlainRemote(req.Ref))
+		ck, err := a.client.Fetch(ctx, req.Ref, a.withPlainRemote(req.Ref))
 		if err != nil {
 			return nil, err
 		}
@@ -703,13 +711,17 @@ func (a *Agent) Restore(ctx context.Context, req *v1.RestoreRequest) (*v1.Restor
 	if err != nil {
 		return nil, err
 	}
-	image, err := a.client.Pull(ctx, config.Image, containerd.WithPullUnpack, withPlainRemote(config.Image))
+	image, err := a.client.Pull(ctx, config.Image, containerd.WithPullUnpack, a.withPlainRemote(config.Image))
+	if err != nil {
+		return nil, err
+	}
+	volumeRoot, err := redis.String(a.doLocal("GET", v1.VolumeRootKey))
 	if err != nil {
 		return nil, err
 	}
 	o := []containerd.NewContainerOpts{
 		flux.WithNewSnapshot(image),
-		opts.WithBossConfig(a.c.Agent.VolumeRoot, config, image),
+		opts.WithBossConfig(volumeRoot, config, image),
 	}
 	if req.Live {
 		desc, err := getByMediaType(index, images.MediaTypeContainerd1Checkpoint)
@@ -799,6 +811,12 @@ func (a *Agent) Migrate(ctx context.Context, req *v1.MigrateRequest) (*v1.Migrat
 	return &v1.MigrateResponse{}, nil
 }
 
+func (a *Agent) doLocal(action string, args ...interface{}) (interface{}, error) {
+	conn := a.local.Get()
+	defer conn.Close()
+	return conn.Do(action, args...)
+}
+
 var (
 	errServiceExistsOnTarget = errors.New("service exists on target")
 	errMediaTypeNotFound     = errors.New("media type not found in index")
@@ -813,11 +831,15 @@ func getByMediaType(index *is.Index, mt string) (*is.Descriptor, error) {
 	return nil, errMediaTypeNotFound
 }
 
-func withPlainRemote(ref string) containerd.RemoteOpt {
+func (a *Agent) withPlainRemote(ref string) containerd.RemoteOpt {
 	remote := strings.SplitN(ref, "/", 2)[0]
 	return func(_ *containerd.Client, ctx *containerd.RemoteContext) error {
+		ok, err := redis.Bool(a.doLocal("SISMEMBER", v1.PlainRemotesKey, remote))
+		if err != nil {
+			return err
+		}
 		ctx.Resolver = docker.NewResolver(docker.ResolverOptions{
-			PlainHTTP: plainRemotes[remote],
+			PlainHTTP: ok,
 			Client:    http.DefaultClient,
 		})
 		return nil

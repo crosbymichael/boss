@@ -19,10 +19,11 @@ type change interface {
 type imageUpdateChange struct {
 	ref    string
 	client *containerd.Client
+	a      *Agent
 }
 
 func (c *imageUpdateChange) update(ctx context.Context, container containerd.Container) error {
-	image, err := c.client.Pull(ctx, c.ref, containerd.WithPullUnpack, withPlainRemote(c.ref))
+	image, err := c.client.Pull(ctx, c.ref, containerd.WithPullUnpack, c.a.withPlainRemote(c.ref))
 	if err != nil {
 		return err
 	}

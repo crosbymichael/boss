@@ -13,6 +13,8 @@ const (
 	DefaultRuntime   = "io.containerd.runc.v1"
 	DefaultNamespace = "boss"
 	// configuration keys
+	PlainRemotesKey = "io.boss.agent.plain-remotes"
+	VolumeRootKey   = "io.boss.agent.volume-root"
 )
 
 func StatePath(id string) string {
