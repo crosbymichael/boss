@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 
 	"github.com/crosbymichael/boss/agent"
 	"github.com/crosbymichael/boss/api/v1"
@@ -36,6 +37,11 @@ var agentCommand = cli.Command{
 			Usage: "the cluster port for gossip",
 			Value: 1338,
 		},
+		cli.IntFlag{
+			Name:  "store-port",
+			Usage: "the ledis store port",
+			Value: 6379,
+		},
 		cli.StringSliceFlag{
 			Name:  "peers",
 			Usage: "set the agent peers",
@@ -58,6 +64,7 @@ var agentCommand = cli.Command{
 		if id == "" {
 			id = c.ID
 		}
+		c.ID = id
 		ip, err := util.GetIP(c.Iface)
 		if err != nil {
 			return err
@@ -71,6 +78,7 @@ var agentCommand = cli.Command{
 		if c.Agent.Master {
 			labels[agent.Master] = "!"
 		}
+		labels[agent.StorePort] = strconv.Itoa(clix.Int("store-port"))
 		logrus.WithField("address", address).Debug("agent address")
 		node, err := element.NewAgent(&element.Config{
 			NodeName:         id,
@@ -98,7 +106,8 @@ var agentCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		a, err := agent.New(c, client, store, node)
+		logrus.Debug("creating new agent")
+		a, err := agent.New(c, client, store, node, clix.Int("store-port"))
 		if err != nil {
 			return err
 		}
@@ -109,6 +118,7 @@ var agentCommand = cli.Command{
 			go node.Shutdown()
 			server.Stop()
 		}()
+		logrus.Debug("starting grpc listener")
 		l, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", clix.Int("agent-port")))
 		if err != nil {
 			return err

@@ -86,6 +86,7 @@ func (d *agentDelegate) MergeRemoteState(buf []byte, join bool) {
 		Name:    remoteAgent.Name,
 		Addr:    remoteAgent.Addr,
 		Updated: d.Updated,
+		Labels:  remoteAgent.Labels,
 	}
 	// notify update
 	d.updateChan <- true

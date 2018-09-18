@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -56,19 +57,21 @@ var (
 const (
 	MediaTypeContainerInfo = "application/vnd.boss.container.info.v1+json"
 	Master                 = "boss.io/master"
+	StorePort              = "boss.io/store.port"
 )
 
-func New(c *config.Config, client *containerd.Client, store config.ConfigStore, node *element.Agent) (*Agent, error) {
+func New(c *config.Config, client *containerd.Client, store config.ConfigStore, node *element.Agent, storePort int) (*Agent, error) {
 	register, err := c.GetRegister()
 	if err != nil {
 		return nil, err
 	}
-	server, err := newLocalStore(c)
+	server, err := newLocalStore(c, storePort)
 	if err != nil {
 		return nil, err
 	}
+	logrus.Debug("connecting to other nodes")
 	var (
-		local  = "127.0.0.1:6379"
+		local  = fmt.Sprintf("127.0.0.1:%d", storePort)
 		master = local
 	)
 	if !c.Agent.Master {
@@ -79,7 +82,12 @@ func New(c *config.Config, client *containerd.Client, store config.ConfigStore, 
 		}
 		for _, p := range peers {
 			if _, ok := p.Labels[Master]; ok {
-				master = p.Addr
+				host, _, err := net.SplitHostPort(p.Addr)
+				if err != nil {
+					return nil, err
+				}
+				// move port to lables
+				master = net.JoinHostPort(host, p.Labels[StorePort])
 				break
 			}
 		}
@@ -95,7 +103,11 @@ func New(c *config.Config, client *containerd.Client, store config.ConfigStore, 
 		lp = newPool(local)
 		conn := lp.Get()
 		defer conn.Close()
-		if _, err := conn.Do("SLAVEOF", master); err != nil {
+		host, port, err := net.SplitHostPort(master)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := conn.Do("SLAVEOF", host, port); err != nil {
 			return nil, err
 		}
 	}
@@ -117,14 +129,16 @@ func newPool(address string) *redis.Pool {
 	}, 5)
 }
 
-func newLocalStore(c *config.Config) (*server.App, error) {
+func newLocalStore(c *config.Config, storePort int) (*server.App, error) {
 	cfg := lconfig.NewConfigDefault()
-	cfg.Addr = "0.0.0.0:6379"
+	cfg.Addr = fmt.Sprintf("0.0.0.0:%d", storePort)
+	logrus.WithField("store", cfg.Addr).Debug("store address")
 	cfg.UseReplication = true
-	cfg.DataDir = filepath.Join(v1.Root, "db")
+	cfg.DataDir = filepath.Join(v1.Root, c.ID)
 	if !c.Agent.Master {
 		cfg.Readonly = true
 	}
+	logrus.Debug("serving ledis store")
 	server, err := server.NewApp(cfg)
 	if err != nil {
 		return nil, err
