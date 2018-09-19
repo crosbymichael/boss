@@ -111,7 +111,7 @@ func New(c *config.Config, client *containerd.Client, store config.ConfigStore, 
 			return nil, err
 		}
 	}
-	return &Agent{
+	agent := &Agent{
 		c:        c,
 		client:   client,
 		store:    store,
@@ -120,7 +120,11 @@ func New(c *config.Config, client *containerd.Client, store config.ConfigStore, 
 		server:   server,
 		master:   mp,
 		local:    lp,
-	}, nil
+	}
+	if err := agent.handleResolvConf(); err != nil {
+		return nil, err
+	}
+	return agent, nil
 }
 
 func newPool(address string) *redis.Pool {
@@ -883,6 +887,30 @@ func (a *Agent) withPlainRemote(ref string) containerd.RemoteOpt {
 	}
 }
 
+func (a *Agent) handleResolvConf() error {
+	peers, err := a.node.Peers()
+	if err != nil {
+		return err
+	}
+	me, err := a.node.LocalNode()
+	if err != nil {
+		return err
+	}
+	if err := writeResolvConf(append(peers, me)); err != nil {
+		return err
+	}
+	c := make(chan *element.NodeEvent, 32)
+	a.node.Subscribe(c)
+	go func() {
+		for range c {
+			if err := writeResolvConf(append(peers, me)); err != nil {
+				logrus.WithError(err).Error("update resolv config")
+			}
+		}
+	}()
+	return nil
+}
+
 func getBindSizes(c *v1.Container) (size int64, _ error) {
 	for _, m := range c.Mounts {
 		f, err := os.Open(m.Source)
@@ -963,4 +991,22 @@ func decodeIndex(ctx context.Context, store content.Provider, desc is.Descriptor
 		return nil, err
 	}
 	return &index, nil
+}
+
+func writeResolvConf(peers []*element.PeerAgent) error {
+	f, err := os.OpenFile(filepath.Join(v1.Root, "resolv.conf"), os.O_TRUNC|os.O_WRONLY|os.O_CREATE, 0666)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	for _, p := range peers {
+		host, _, err := net.SplitHostPort(p.Addr)
+		if err != nil {
+			return err
+		}
+		if _, err := f.WriteString(fmt.Sprintf("nameserver %s\n", host)); err != nil {
+			return err
+		}
+	}
+	return nil
 }

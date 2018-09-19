@@ -63,7 +63,6 @@ type Config struct {
 	CNI          *CNI          `toml:"cni"`
 	Consul       *Consul       `toml:"consul"`
 	NodeExporter *NodeExporter `toml:"nodeexporter"`
-	Nameservers  []string      `toml:"nameservers"`
 	Timezone     string        `toml:"timezone"`
 	MOTD         *MOTD         `toml:"motd"`
 	SSH          *SSH          `toml:"ssh"`
@@ -122,31 +121,6 @@ func (c *Config) GetNetwork(name string) (v1.Network, error) {
 		return cni.New(c.CNI.Type, c.Iface, c.CNI.BridgeAddress, n)
 	}
 	return nil, errors.Errorf("network %s does not exist", name)
-}
-
-func (c *Config) GetNameservers() ([]string, error) {
-	if c.Consul != nil {
-		consulOnce.Do(getConsul)
-		if consulErr != nil {
-			return nil, consulErr
-		}
-		nodes, _, err := consul.Catalog().Nodes(&api.QueryOptions{})
-		if err != nil {
-			return nil, err
-		}
-		var ns []string
-		for _, n := range nodes {
-			ns = append(ns, n.Address)
-		}
-		return ns, nil
-	}
-	if len(c.Nameservers) == 0 {
-		return []string{
-			"8.8.8.8",
-			"8.8.4.4",
-		}, nil
-	}
-	return c.Nameservers, nil
 }
 
 func (c *Config) GetRegister() (v1.Register, error) {

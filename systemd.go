@@ -3,11 +3,8 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
-	"io/ioutil"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
@@ -46,13 +43,6 @@ var systemdExecStartPreCommand = cli.Command{
 	Usage: "exec-start-pre proxy for containers",
 	Action: func(clix *cli.Context) error {
 		id := clix.Args().First()
-		c, err := config.Load()
-		if err != nil {
-			return err
-		}
-		if err := setupResolvConf(id, c); err != nil {
-			return err
-		}
 		if err := setupApparmor(); err != nil {
 			return err
 		}
@@ -268,31 +258,6 @@ func systemdPreSetup(clix *cli.Context) error {
 		return errIDRequired
 	}
 	return nil
-}
-
-func setupResolvConf(id string, c *config.Config) error {
-	servers, err := c.GetNameservers()
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Join(v1.Root, id), 0711); err != nil {
-		return err
-	}
-	f, err := ioutil.TempFile("", "boss-resolvconf")
-	if err != nil {
-		return err
-	}
-	if err := f.Chmod(0666); err != nil {
-		return err
-	}
-	for _, ns := range servers {
-		if _, err := f.WriteString(fmt.Sprintf("nameserver %s\n", ns)); err != nil {
-			f.Close()
-			return err
-		}
-	}
-	f.Close()
-	return os.Rename(f.Name(), filepath.Join(v1.Root, id, "resolv.conf"))
 }
 
 func setupApparmor() error {
