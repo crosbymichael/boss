@@ -1,4 +1,4 @@
-![banner](https://github.com/containerd/containerd.io/blob/master/static/img/containerd-dark.png?raw=true)
+![containerd banner](https://raw.githubusercontent.com/cncf/artwork/master/containerd/horizontal/color/containerd-horizontal-color.png)
 
 [![GoDoc](https://godoc.org/github.com/containerd/containerd?status.svg)](https://godoc.org/github.com/containerd/containerd)
 [![Build Status](https://travis-ci.org/containerd/containerd.svg?branch=master)](https://travis-ci.org/containerd/containerd)
@@ -172,11 +172,9 @@ checkpoint, err := task.Checkpoint(context)
 err := client.Push(context, "myregistry/checkpoints/redis:master", checkpoint)
 
 // on a new machine pull the checkpoint and restore the redis container
-image, err := client.Pull(context, "myregistry/checkpoints/redis:master")
+checkpoint, err := client.Pull(context, "myregistry/checkpoints/redis:master")
 
-checkpoint := image.Target()
-
-redis, err = client.NewContainer(context, "redis-master", containerd.WithCheckpoint(checkpoint, "redis-rootfs"))
+redis, err = client.NewContainer(context, "redis-master", containerd.WithNewSnapshot("redis-rootfs", checkpoint))
 defer container.Delete(context)
 
 task, err = redis.NewTask(context, cio.Stdio, containerd.WithTaskCheckpoint(checkpoint))
@@ -212,11 +210,6 @@ See [PLUGINS.md](PLUGINS.md) for how to create plugins
 Please see [RELEASES.md](RELEASES.md) for details on versioning and stability
 of containerd components.
 
-### Development reports.
-
-Weekly summary on the progress and what is being worked on.
-https://github.com/containerd/containerd/tree/master/reports
-
 ### Communication
 
 For async communication and long running discussions please use issues and pull requests on the github repo.
@@ -224,7 +217,12 @@ This will be the best place to discuss design and implementation.
 
 For sync communication we have a community slack with a #containerd channel that everyone is welcome to join and chat about development.
 
-**Slack:** https://dockr.ly/community
+**Slack:** Catch us in the #containerd and #containerd-dev channels on dockercommunity.slack.com.
+[Click here for an invite to docker community slack.](https://join.slack.com/t/dockercommunity/shared_invite/enQtNDY4MDc1Mzc0MzIwLTgxZDBlMmM4ZGEyNDc1N2FkMzlhODJkYmE1YTVkYjM1MDE3ZjAwZjBkOGFlOTJkZjRmZGYzNjYyY2M3ZTUxYzQ)
+
+### Security audit
+
+A third party security audit was performed by Cure53 in 4Q2018; the [full report](docs/SECURITY_AUDIT.pdf) is available in our docs/ directory.
 
 ### Reporting security issues
 
@@ -236,3 +234,21 @@ The containerd codebase is released under the [Apache 2.0 license](LICENSE.code)
 The README.md file, and files in the "docs" folder are licensed under the
 Creative Commons Attribution 4.0 International License. You may obtain a
 copy of the license, titled CC-BY-4.0, at http://creativecommons.org/licenses/by/4.0/.
+
+## Project details
+
+**containerd** is the primary open source project within the broader containerd GitHub repository.
+However, all projects within the repo have common maintainership, governance, and contributing
+guidelines which are stored in a `project` repository commonly for all containerd projects.
+
+Please find all these core project documents, including the:
+ * [Project governance](https://github.com/containerd/project/blob/master/GOVERNANCE.md),
+ * [Maintainers](https://github.com/containerd/project/blob/master/MAINTAINERS),
+ * and [Contributing guidelines](https://github.com/containerd/project/blob/master/CONTRIBUTING.md)
+
+information in our [`containerd/project`](https://github.com/containerd/project) repository.
+
+## Adoption
+
+Interested to see who is using containerd? Are you using containerd in a project?
+Please add yourself via pull request to our [ADOPTERS.md](./ADOPTERS.md) file.

@@ -1,3 +1,5 @@
+// +build windows
+
 /*
    Copyright The containerd Authors.
 
@@ -14,17 +16,15 @@
    limitations under the License.
 */
 
-package archive
+package commands
 
 import (
-	"time"
-
-	"github.com/pkg/errors"
+	"github.com/urfave/cli"
 )
 
-// as at MacOS 10.12 there is apparently no way to set timestamps
-// with nanosecond precision. We could fall back to utimes/lutimes
-// and lose the precision as a temporary workaround.
-func chtimes(path string, atime, mtime time.Time) error {
-	return errors.New("OSX missing UtimesNanoAt")
+func init() {
+	ContainerFlags = append(ContainerFlags, cli.Uint64Flag{
+		Name:  "cpu-count",
+		Usage: "number of CPUs available to the container",
+	})
 }
