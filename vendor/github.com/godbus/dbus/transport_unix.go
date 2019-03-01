@@ -1,4 +1,4 @@
-//+build !windows,!solaris
+//+build !windows
 
 package dbus
 
@@ -148,23 +148,11 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 		// substitute the values in the message body (which are indices for the
 		// array receiver via OOB) with the actual values
 		for i, v := range msg.Body {
-			switch v.(type) {
-			case UnixFDIndex:
-				j := v.(UnixFDIndex)
+			if j, ok := v.(UnixFDIndex); ok {
 				if uint32(j) >= unixfds {
 					return nil, InvalidMessageError("invalid index for unix fd")
 				}
 				msg.Body[i] = UnixFD(fds[j])
-			case []UnixFDIndex:
-				idxArray := v.([]UnixFDIndex)
-				fdArray := make([]UnixFD, len(idxArray))
-				for k, j := range idxArray {
-					if uint32(j) >= unixfds {
-						return nil, InvalidMessageError("invalid index for unix fd")
-					}
-					fdArray[k] = UnixFD(fds[j])
-				}
-				msg.Body[i] = fdArray
 			}
 		}
 		return msg, nil
@@ -187,7 +175,7 @@ func (t *unixTransport) SendMessage(msg *Message) error {
 		msg.Headers[FieldUnixFDs] = MakeVariant(uint32(len(fds)))
 		oob := syscall.UnixRights(fds...)
 		buf := new(bytes.Buffer)
-		msg.EncodeTo(buf, nativeEndian)
+		msg.EncodeTo(buf, binary.LittleEndian)
 		n, oobn, err := t.UnixConn.WriteMsgUnix(buf.Bytes(), oob, nil)
 		if err != nil {
 			return err
@@ -196,7 +184,7 @@ func (t *unixTransport) SendMessage(msg *Message) error {
 			return io.ErrShortWrite
 		}
 	} else {
-		if err := msg.EncodeTo(t, nativeEndian); err != nil {
+		if err := msg.EncodeTo(t, binary.LittleEndian); err != nil {
 			return nil
 		}
 	}

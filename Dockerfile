@@ -1,12 +1,27 @@
-FROM golang:1.10.3-alpine3.8 as builder
+FROM golang:1.12 as containerd
 
-RUN apk add --no-cache git alpine-sdk make
+RUN apt-get update && \
+	apt-get install -y rsync autoconf automake g++ libtool unzip \
+	btrfs-tools gcc git libseccomp-dev make xfsprogs
 
+RUN git clone https://github.com/containerd/containerd /go/src/github.com/containerd/containerd
 ADD . /go/src/github.com/crosbymichael/boss
-WORKDIR /go/src/github.com/crosbymichael/boss
 
-RUN make static
+RUN rsync -au /go/src/github.com/containerd/containerd/vendor/ /go/src/ && \
+	rm -rf /go/src/github.com/containerd/containerd/vendor/
+
+RUN rsync -au --ignore-existing /go/src/github.com/crosbymichael/boss/vendor/ /go/src/ && \
+	rm -rf /go/src/github.com/crosbymichael/boss/vendor/
+
+WORKDIR /go/src/github.com/containerd/containerd
+RUN ./script/setup/install-protobuf
+
+FROM containerd AS build
+
+WORKDIR /go/src/github.com/containerd/containerd
+RUN make
+RUN go build -o bin/boss-linux-amd64.so -buildmode=plugin github.com/crosbymichael/boss/plugin
 
 FROM scratch
 
-COPY --from=builder /go/src/github.com/crosbymichael/boss/boss /boss
+COPY --from=build /go/src/github.com/containerd/containerd/bin/* /bin/

@@ -3,7 +3,6 @@ package cli
 import (
 	"errors"
 	"flag"
-	"os"
 	"reflect"
 	"strings"
 	"syscall"
@@ -94,26 +93,18 @@ func (c *Context) IsSet(name string) bool {
 					val = val.Elem()
 				}
 
-				filePathValue := val.FieldByName("FilePath")
-				if filePathValue.IsValid() {
-					eachName(filePathValue.String(), func(filePath string) {
-						if _, err := os.Stat(filePath); err == nil {
-							c.setFlags[name] = true
-							return
-						}
-					})
+				envVarValue := val.FieldByName("EnvVar")
+				if !envVarValue.IsValid() {
+					return
 				}
 
-				envVarValue := val.FieldByName("EnvVar")
-				if envVarValue.IsValid() {
-					eachName(envVarValue.String(), func(envVar string) {
-						envVar = strings.TrimSpace(envVar)
-						if _, ok := syscall.Getenv(envVar); ok {
-							c.setFlags[name] = true
-							return
-						}
-					})
-				}
+				eachName(envVarValue.String(), func(envVar string) {
+					envVar = strings.TrimSpace(envVar)
+					if _, ok := syscall.Getenv(envVar); ok {
+						c.setFlags[name] = true
+						return
+					}
+				})
 			})
 		}
 	}

@@ -11,5 +11,10 @@ static:
 install:
 	@install boss /usr/local/bin/boss
 
+FORCE:
+
+plugin: FORCE
+	go build -o boss-linux-amd64.so -v -buildmode=plugin github.com/crosbymichael/boss/plugin/
+
 protos:
 	protobuild --quiet ${PACKAGES}
