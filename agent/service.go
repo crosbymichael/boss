@@ -1,4 +1,4 @@
-package main
+package agent
 
 import (
 	"github.com/containerd/containerd"
@@ -12,8 +12,7 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/containerd/snapshots"
-	"github.com/crosbymichael/boss/agent"
-	"github.com/crosbymichael/boss/api/v1"
+	v1 "github.com/crosbymichael/boss/api/v1"
 	"github.com/crosbymichael/boss/config"
 	"github.com/pkg/errors"
 )
@@ -48,7 +47,7 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			return agent.New(c, client, store)
+			return New(c, client, store)
 		},
 	})
 }
@@ -103,8 +102,4 @@ func getServicesOpts(ic *plugin.InitContext) ([]containerd.ServicesOpt, error) {
 		opts = append(opts, fn(i))
 	}
 	return opts, nil
-}
-
-func main() {
-
 }

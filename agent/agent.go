@@ -28,7 +28,7 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/typeurl"
 	"github.com/crosbymichael/boss/api"
-	"github.com/crosbymichael/boss/api/v1"
+	v1 "github.com/crosbymichael/boss/api/v1"
 	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/flux"
 	"github.com/crosbymichael/boss/opts"
@@ -180,7 +180,7 @@ func (a *Agent) info(ctx context.Context, c containerd.Container) (*v1.Container
 	d := info.Extensions[opts.CurrentConfig]
 	cfg, err := opts.UnmarshalConfig(&d)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "unmarshal config")
 	}
 
 	service := a.client.SnapshotService(info.Snapshotter)
