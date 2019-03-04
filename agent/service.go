@@ -15,19 +15,25 @@ import (
 	v1 "github.com/crosbymichael/boss/api/v1"
 	"github.com/crosbymichael/boss/config"
 	"github.com/pkg/errors"
+	"google.golang.org/grpc"
 )
 
 func init() {
+	c, err := config.Load()
+	if err != nil {
+		panic(err)
+	}
 	plugin.Register(&plugin.Registration{
-		Type: plugin.GRPCPlugin,
-		ID:   "boss",
+		Type:   plugin.GRPCPlugin,
+		ID:     "boss",
+		Config: c,
 		Requires: []plugin.Type{
 			plugin.ServicePlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			// ic.Meta.Platforms = []imagespec.Platform{platforms.DefaultSpec()}
 			//	ic.Meta.Exports = map[string]string{"CRIVersion": constants.CRIVersion}
-			c, err := config.Load()
+			c := ic.Config.(*config.Config)
 			if err != nil {
 				return nil, err
 			}
@@ -50,6 +56,16 @@ func init() {
 			return New(c, client, store)
 		},
 	})
+}
+
+func (a *Agent) Register(server *grpc.Server) error {
+	v1.RegisterAgentServer(server, a)
+	return nil
+}
+
+func (a *Agent) RegisterTCP(server *grpc.Server) error {
+	v1.RegisterAgentServer(server, a)
+	return nil
 }
 
 // getServicesOpts get service options from plugin context.

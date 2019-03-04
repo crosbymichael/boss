@@ -39,7 +39,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
-	"google.golang.org/grpc"
 )
 
 var (
@@ -75,11 +74,6 @@ type Agent struct {
 	client   *containerd.Client
 	store    config.ConfigStore
 	register v1.Register
-}
-
-func (a *Agent) Register(server *grpc.Server) error {
-	v1.RegisterAgentServer(server, a)
-	return nil
 }
 
 func (a *Agent) Create(ctx context.Context, req *v1.CreateRequest) (*types.Empty, error) {

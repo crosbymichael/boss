@@ -15,21 +15,23 @@ RUN apt-get update && \
 	make \
 	xfsprogs
 
-ENV CONTAINERD_VERSION 30b6f460b96137947b3de5ec92134d56cb763708
-RUN git clone https://github.com/containerd/containerd /go/src/github.com/containerd/containerd
+ENV CONTAINERD_VERSION 27cafbb3b81481347eace9bae2751ec0220cc02c
+RUN git clone https://github.com/crosbymichael/containerd /go/src/github.com/containerd/containerd
+
+WORKDIR /go/src/github.com/containerd/containerd
+RUN git checkout ${CONTAINERD_VERSION}
 
 RUN rsync -au /go/src/github.com/containerd/containerd/vendor/ /go/src/ && \
 	rm -rf /go/src/github.com/containerd/containerd/vendor/
 
-WORKDIR /go/src/github.com/containerd/containerd
-RUN git checkout ${CONTAINERD_VERSION}
 RUN ./script/setup/install-protobuf
 RUN make
 
 FROM containerd AS boss
 
 ADD . /go/src/github.com/crosbymichael/boss
-RUN rsync -au --ignore-existing /go/src/github.com/crosbymichael/boss/vendor/ /go/src/ && \
+RUN	rm -rf /go/src/github.com/crosbymichael/boss/vendor/github.com/containerd/ && \
+	rsync -au --ignore-existing /go/src/github.com/crosbymichael/boss/vendor/ /go/src/ && \
 	rm -rf /go/src/github.com/crosbymichael/boss/vendor/
 
 WORKDIR /go/src/github.com/crosbymichael/boss
