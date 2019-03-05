@@ -101,7 +101,7 @@ func (n *cni) Remove(ctx context.Context, c containerd.Container) error {
 }
 
 func createNetns(path string) error {
-	cmd := exec.Command("boss-systemd", "network", "create", path)
+	cmd := exec.Command("boss-network", "create", path)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Cloneflags: unix.CLONE_NEWNET,
 	}
