@@ -10,7 +10,7 @@ import (
 
 	"github.com/containerd/containerd"
 	networking "github.com/containerd/go-cni"
-	"github.com/crosbymichael/boss/api/v1"
+	v1 "github.com/crosbymichael/boss/api/v1"
 	"github.com/crosbymichael/boss/opts"
 	"github.com/crosbymichael/boss/route"
 	"github.com/pkg/errors"
@@ -101,7 +101,7 @@ func (n *cni) Remove(ctx context.Context, c containerd.Container) error {
 }
 
 func createNetns(path string) error {
-	cmd := exec.Command("boss", "network", "create", path)
+	cmd := exec.Command("boss-systemd", "network", "create", path)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Cloneflags: unix.CLONE_NEWNET,
 	}

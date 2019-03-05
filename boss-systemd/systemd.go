@@ -15,7 +15,7 @@ import (
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/crosbymichael/boss/api/v1"
+	v1 "github.com/crosbymichael/boss/api/v1"
 	"github.com/crosbymichael/boss/config"
 	"github.com/crosbymichael/boss/opts"
 	"github.com/crosbymichael/boss/system"
@@ -28,18 +28,6 @@ var (
 	errIDRequired     = errors.New("container id is required")
 	errUnableToSignal = errors.New("unable to signal task")
 )
-
-var systemdCommand = cli.Command{
-	Name:   "systemd",
-	Usage:  "systemd proxy for containers",
-	Hidden: true,
-	Before: systemdPreSetup,
-	Subcommands: []cli.Command{
-		systemdExecStartPreCommand,
-		systemdExecStartCommand,
-		systemdExecStopPostCommand,
-	},
-}
 
 var systemdExecStartPreCommand = cli.Command{
 	Name:  "exec-start-pre",

@@ -8,7 +8,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/containerd/containerd"
 	gocni "github.com/containerd/go-cni"
-	"github.com/crosbymichael/boss/api/v1"
+	v1 "github.com/crosbymichael/boss/api/v1"
 	"github.com/crosbymichael/boss/cni"
 	"github.com/crosbymichael/boss/consulregister"
 	"github.com/crosbymichael/boss/util"
@@ -163,7 +163,6 @@ func (c *Config) GetRegister() (v1.Register, error) {
 func (c *Config) Steps() []Step {
 	steps := []Step{
 		&Mkdir{},
-		&Systemd{},
 		&Timezone{TZ: c.Timezone},
 		&c.Agent,
 	}

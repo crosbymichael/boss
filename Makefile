@@ -3,7 +3,8 @@ REVISION=$(shell git rev-parse HEAD)
 GO_LDFLAGS=-s -w -X github.com/crosbymichael/boss/version.Version=$(REVISION)
 
 all:
-	go build -v -ldflags '${GO_LDFLAGS}'
+	go build -o bin/boss -v -ldflags '${GO_LDFLAGS}'
+	go build -o bin/boss-systemd -v -ldflags '${GO_LDFLAGS}' github.com/crosbymichael/boss/boss-systemd
 
 static:
 	CGO_ENALBED=0 go build -v -ldflags '${GO_LDFLAGS} -extldflags "-static"'
