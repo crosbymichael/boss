@@ -1,6 +1,6 @@
 id = "redis"
 image = "docker.io/library/redis:4.0-alpine"
-network = "none"
+network = ""
 
 [resources]
 	cpu = 1.5

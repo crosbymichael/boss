@@ -154,6 +154,7 @@ message Container {
 	map<string, Config> configs = 9;
 	bool readonly = 10;
 	repeated Volume volumes = 11;
+	bool privileged = 12;
 }
 
 message Volume {

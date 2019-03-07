@@ -1,5 +1,5 @@
 version = "unstable"
-generator = "gogo"
+generator = "gogoctrd"
 plugins = ["grpc"]
 
 # Control protoc include paths. Below are usually some good defaults, but feel

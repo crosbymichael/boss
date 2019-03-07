@@ -4,6 +4,11 @@ import (
 	"encoding/json"
 )
 
+type IPAM struct {
+	Type   string `toml:"type" json:"type"`
+	Subnet string `toml:"subnet" json:"subnet"`
+}
+
 type CNI struct {
 	Image         string `toml:"image" json:"-"`
 	Version       string `toml:"-" json:"cniVersion,omitempty"`
@@ -21,11 +26,6 @@ func (c *CNI) Bytes() []byte {
 		panic(err)
 	}
 	return data
-}
-
-type IPAM struct {
-	Type   string `toml:"type" json:"type"`
-	Subnet string `toml:"subnet" json:"subnet"`
 }
 
 func (s *CNI) Name() string {

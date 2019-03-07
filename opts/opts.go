@@ -16,7 +16,7 @@ import (
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/typeurl"
-	"github.com/crosbymichael/boss/api/v1"
+	v1 "github.com/crosbymichael/boss/api/v1"
 	"github.com/gogo/protobuf/types"
 	is "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -66,6 +66,9 @@ func specOpt(volumeRoot string, config *v1.Container, image containerd.Image) oc
 		withMounts(config.Mounts),
 		withVolumes(volumeRoot, config.Volumes),
 		withConfigs(config.Configs),
+	}
+	if config.Privileged {
+		opts = append(opts, oci.WithPrivileged)
 	}
 	if config.Network == "host" {
 		opts = append(opts, oci.WithHostHostsFile, oci.WithHostResolvconf, oci.WithHostNamespace(specs.NetworkNamespace))

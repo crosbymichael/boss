@@ -1,6 +1,6 @@
 package cmd
 
-import "github.com/crosbymichael/boss/api/v1"
+import v1 "github.com/crosbymichael/boss/api/v1"
 
 const Version = "v1"
 
@@ -21,6 +21,7 @@ type Container struct {
 	Readonly      bool               `toml:"readonly"`
 	Capabilities  []string           `toml:"caps"`
 	Volumes       map[string]Volume  `toml:"volumes"`
+	Privileged    bool               `toml:"privileged"`
 }
 
 func (c *Container) Proto() *v1.Container {
@@ -33,9 +34,10 @@ func (c *Container) Proto() *v1.Container {
 			Env:          c.Env,
 			Capabilities: c.Capabilities,
 		},
-		Readonly: c.Readonly,
-		Services: make(map[string]*v1.Service),
-		Configs:  make(map[string]*v1.Config),
+		Readonly:   c.Readonly,
+		Privileged: c.Privileged,
+		Services:   make(map[string]*v1.Service),
+		Configs:    make(map[string]*v1.Config),
 	}
 	for _, m := range c.Mounts {
 		container.Mounts = append(container.Mounts, &v1.Mount{

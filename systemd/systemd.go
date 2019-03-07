@@ -34,5 +34,5 @@ func Command(ctx context.Context, args ...string) error {
 }
 
 func serviceName(id string) string {
-	return fmt.Sprintf("boss-v2-@%s.service", id)
+	return fmt.Sprintf("boss-v2@%s.service", id)
 }
